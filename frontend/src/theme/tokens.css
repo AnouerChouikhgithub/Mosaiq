@@ -1,0 +1,227 @@
+/*
+ * Mosaiq theme tokens — the single source of truth for every color.
+ * Components must use the semantic Tailwind utilities generated here
+ * (bg-surface, text-muted-foreground, border-border, ...) and never raw hex.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+
+  /* Layered neutrals */
+  --background: #f8fafc;
+  --surface: #ffffff;
+  --elevated: #ffffff;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --foreground: #0f172a;
+  --muted-foreground: #475569;
+  --muted: #f1f5f9;
+  --hover: #f1f5f9;
+
+  /* Brand */
+  --primary: #6d4aff;
+  --primary-hover: #5b37f5;
+  --primary-foreground: #ffffff;
+  --primary-soft: #efeaff;
+  --primary-soft-foreground: #4c2fd6;
+  --ring: #6d4aff;
+
+  /* Status */
+  --success: #16a34a;
+  --success-soft: #dcfce7;
+  --success-text: #166534;
+  --success-foreground: #ffffff;
+  --warning: #d97706;
+  --warning-soft: #fef3c7;
+  --warning-text: #92400e;
+  --danger: #dc2626;
+  --danger-soft: #fee2e2;
+  --danger-text: #991b1b;
+  --danger-foreground: #ffffff;
+  --info: #2563eb;
+  --info-soft: #dbeafe;
+  --info-text: #1d4ed8;
+  --info-foreground: #ffffff;
+
+  /* Board surface */
+  --canvas: #f8fafc;
+  --grid-dot: #cbd5e1;
+
+  /* Sticky notes — five soft colors, each with its own ink */
+  --note-amber: #fde68a;
+  --note-amber-ink: #3f2d0b;
+  --note-rose: #fecdd3;
+  --note-rose-ink: #4c0519;
+  --note-sky: #bae6fd;
+  --note-sky-ink: #082f49;
+  --note-mint: #bbf7d0;
+  --note-mint-ink: #052e16;
+  --note-lilac: #ddd6fe;
+  --note-lilac-ink: #2e1065;
+
+  /* Live presence cursors */
+  --cursor-1: #c2410c;
+  --cursor-2: #075985;
+  --cursor-3: #166534;
+  --cursor-foreground: #ffffff;
+
+  /* Elevation */
+  --shadow-card:
+    0 1px 2px rgb(15 23 42 / 0.05), 0 12px 28px -18px rgb(15 23 42 / 0.22);
+  --shadow-overlay: 0 28px 70px -28px rgb(15 23 42 / 0.35);
+  --overlay: rgb(15 23 42 / 0.45);
+
+  /* Feedback */
+  --toast: #0f172a;
+  --toast-foreground: #f8fafc;
+}
+
+.dark {
+  color-scheme: dark;
+
+  /* Layered surfaces: background < surface < elevated */
+  --background: #0b0f14;
+  --surface: #121821;
+  --elevated: #1a2230;
+  --border: #263041;
+  --border-strong: #36445b;
+  --foreground: #e6eaf0;
+  --muted-foreground: #9aa6b8;
+  --muted: #161d27;
+  --hover: #1a2230;
+
+  /* The brand color is lighter and slightly desaturated on dark surfaces */
+  --primary: #8b73ff;
+  --primary-hover: #9d89ff;
+  --primary-foreground: #0b0f14;
+  --primary-soft: #241d40;
+  --primary-soft-foreground: #cabfff;
+  --ring: #8b73ff;
+
+  --success: #4ade80;
+  --success-soft: #0f2a1b;
+  --success-text: #4ade80;
+  --success-foreground: #0b0f14;
+  --warning: #fbbf24;
+  --warning-soft: #33260a;
+  --warning-text: #fbbf24;
+  --danger: #f87171;
+  --danger-soft: #3a1414;
+  --danger-text: #f87171;
+  --danger-foreground: #0b0f14;
+  --info: #60a5fa;
+  --info-soft: #11243d;
+  --info-text: #60a5fa;
+  --info-foreground: #0b0f14;
+
+  --canvas: #0b0f14;
+  --grid-dot: #263041;
+
+  --note-amber: #4a3a14;
+  --note-amber-ink: #fde9a5;
+  --note-rose: #4a1d26;
+  --note-rose-ink: #fecdd3;
+  --note-sky: #123344;
+  --note-sky-ink: #bae6fd;
+  --note-mint: #123322;
+  --note-mint-ink: #bbf7d0;
+  --note-lilac: #2a2150;
+  --note-lilac-ink: #ddd6fe;
+
+  --cursor-1: #fb923c;
+  --cursor-2: #38bdf8;
+  --cursor-3: #4ade80;
+  --cursor-foreground: #0b0f14;
+
+  /* Dark mode leans on 1px borders instead of shadows */
+  --shadow-card: none;
+  --shadow-overlay: 0 30px 80px -30px rgb(0 0 0 / 0.8);
+  --overlay: rgb(3 6 10 / 0.72);
+
+  --toast: #e6eaf0;
+  --toast-foreground: #0b0f14;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-hover: var(--hover);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-foreground: var(--primary-soft-foreground);
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-text: var(--success-text);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-text: var(--warning-text);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-text: var(--danger-text);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-text: var(--info-text);
+  --color-info-foreground: var(--info-foreground);
+
+  --color-canvas: var(--canvas);
+  --color-grid-dot: var(--grid-dot);
+
+  --color-note-amber: var(--note-amber);
+  --color-note-amber-ink: var(--note-amber-ink);
+  --color-note-rose: var(--note-rose);
+  --color-note-rose-ink: var(--note-rose-ink);
+  --color-note-sky: var(--note-sky);
+  --color-note-sky-ink: var(--note-sky-ink);
+  --color-note-mint: var(--note-mint);
+  --color-note-mint-ink: var(--note-mint-ink);
+  --color-note-lilac: var(--note-lilac);
+  --color-note-lilac-ink: var(--note-lilac-ink);
+
+  --color-cursor-1: var(--cursor-1);
+  --color-cursor-2: var(--cursor-2);
+  --color-cursor-3: var(--cursor-3);
+  --color-cursor-foreground: var(--cursor-foreground);
+
+  --color-overlay: var(--overlay);
+  --color-toast: var(--toast);
+  --color-toast-foreground: var(--toast-foreground);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-overlay: var(--shadow-overlay);
+
+  --radius-card: 12px;
+  --radius-panel: 16px;
+
+  --font-sans:
+    Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    sans-serif;
+
+  /* Type scale: display 28/34, title 20/28, body 16/24, caption 13/18 */
+  --text-display: 1.75rem;
+  --text-display--line-height: 2.125rem;
+  --text-display--font-weight: 600;
+  --text-display--letter-spacing: -0.02em;
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.75rem;
+  --text-title--font-weight: 600;
+  --text-title--letter-spacing: -0.01em;
+  --text-body: 1rem;
+  --text-body--line-height: 1.5rem;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.125rem;
+  --text-caption--font-weight: 500;
+}

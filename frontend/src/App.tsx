@@ -1,122 +1,72 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useCallback, useEffect, useState } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { CommandPalette } from '@/components/command/CommandPalette'
+import { ToastProvider } from '@/components/ui/toast'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { I18nProvider } from '@/i18n'
+import { ThemeProvider } from '@/theme/ThemeProvider'
+import { getSessionToken } from '@/api/client'
+import { PublicBoardScreen } from '@/screens/PublicBoardScreen'
+import { BoardEditorScreen } from '@/screens/BoardEditorScreen'
+import { DashboardScreen } from '@/screens/DashboardScreen'
+import { SettingsScreen } from '@/screens/SettingsScreen'
+import { SignInScreen } from '@/screens/SignInScreen'
+import { TimeTravelScreen } from '@/screens/TimeTravelScreen'
 
-function App() {
-  const [count, setCount] = useState(0)
+function AppRoutes() {
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const openPalette = useCallback(() => setPaletteOpen(true), [])
+  // Guards read the session token; subscribe to location so they re-evaluate after sign-in.
+  const location = useLocation()
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setPaletteOpen((open) => !open)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   return (
     <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
+      <Routes location={location}>
+        <Route path="/sign-in" element={<SignInScreen />} />
+        <Route path="/share/:boardId" element={<PublicBoardScreen />} />
+        <Route
+          path="/"
+          element={getSessionToken() ? <DashboardScreen onOpenPalette={openPalette} /> : <Navigate to="/sign-in" replace />}
+        />
+        <Route
+          path="/settings"
+          element={getSessionToken() ? <SettingsScreen onOpenPalette={openPalette} /> : <Navigate to="/sign-in" replace />}
+        />
+        <Route
+          path="/board/:boardId"
+          element={getSessionToken() ? <BoardEditorScreen onOpenPalette={openPalette} /> : <PublicBoardScreen />}
+        />
+        <Route path="/board/:boardId/replay" element={getSessionToken() ? <TimeTravelScreen /> : <Navigate to="/sign-in" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <I18nProvider>
+      <ThemeProvider>
+        <TooltipProvider delayDuration={350}>
+          <ToastProvider>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </ToastProvider>
+        </TooltipProvider>
+      </ThemeProvider>
+    </I18nProvider>
+  )
+}

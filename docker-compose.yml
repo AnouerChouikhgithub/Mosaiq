@@ -1,6 +1,9 @@
+name: mosaiq
+
 # Local development services. Symfony and the frontend run on your machine, not in Docker.
 services:
   db:
+    container_name: mosaiq-db
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: app
@@ -9,18 +12,25 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - mosaiq_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d mosaiq"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
+    container_name: mosaiq-redis
     image: redis:7-alpine
     ports:
       - "6379:6379"
 
   mailpit:
+    container_name: mosaiq-mailpit
     image: axllent/mailpit
     ports:
       - "1025:1025"
       - "8025:8025"
 
 volumes:
-  db_data:
+  mosaiq_db_data:

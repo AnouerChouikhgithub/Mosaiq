@@ -1,0 +1,11 @@
+{
+  "name": "mosaiq-workspace",
+  "private": true,
+  "scripts": {
+    "start": "npm --prefix frontend start",
+    "dev": "npm --prefix frontend dev",
+    "build": "npm --prefix frontend build",
+    "lint": "npm --prefix frontend lint",
+    "test": "npm --prefix frontend test"
+  }
+}

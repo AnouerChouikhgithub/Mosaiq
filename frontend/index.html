@@ -1,10 +1,43 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/Mosaiq.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <meta
+      name="description"
+      content="Mosaiq — tableau blanc collaboratif en temps réel, avec notes, formes, curseurs en direct et relecture de l'historique."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <title>Mosaiq — Collaborative Whiteboard</title>
+    <script>
+      // Apply the stored/system theme before first paint to avoid a flash.
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('mosaiq-theme') || 'system'
+          var dark =
+            stored === 'dark' ||
+            (stored === 'system' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.classList.toggle('dark', dark)
+
+          // Apply the stored locale and text direction before first paint.
+          var locale = localStorage.getItem('mosaiq-locale') || 'fr'
+          if (locale !== 'fr' && locale !== 'en' && locale !== 'ar') {
+            locale = 'fr'
+          }
+          document.documentElement.lang = locale
+          document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr'
+        } catch (error) {
+          // Storage can be unavailable; the React provider still applies a theme.
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -19,5 +19,8 @@ services:
     App\:
         resource: '../src/'
 
-    # add more service definitions when explicit configuration is needed
-    # please note that last definitions always *replace* previous ones
+    # The loader needs the resolved DSN and environment to refuse non-local targets.
+    App\DataFixtures\SyntheticFixtureLoader:
+        arguments:
+            $environment: '%kernel.environment%'
+            $databaseUrl: '%env(resolve:DATABASE_URL)%'

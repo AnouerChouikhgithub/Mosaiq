@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Repository;
+
+use App\Entity\Workspace;
+use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\Persistence\ManagerRegistry;
+
+/**
+ * @extends ServiceEntityRepository<Workspace>
+ */
+class WorkspaceRepository extends ServiceEntityRepository
+{
+    public function __construct(ManagerRegistry $registry)
+    {
+        parent::__construct($registry, Workspace::class);
+    }
+
+    public function findByName(string $name): ?Workspace
+    {
+        return $this->findOneBy(['name' => trim($name)]);
+    }
+
+    /** @return list<Workspace> */
+    public function findAllOrdered(): array
+    {
+        return $this->findBy([], ['name' => 'ASC']);
+    }
+}
