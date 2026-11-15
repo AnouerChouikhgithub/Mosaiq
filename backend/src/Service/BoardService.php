@@ -43,15 +43,28 @@ final class BoardService
             }
         }
 
+        if (!is_string($input['type'])) {
+            throw new \InvalidArgumentException('The canvas element type must be a string.');
+        }
+
+        foreach (['x', 'y', 'width', 'height', 'rotation'] as $numeric) {
+            if (!array_key_exists($numeric, $input)) {
+                continue;
+            }
+            if (!is_numeric($input[$numeric]) || !is_finite((float) $input[$numeric])) {
+                throw new \InvalidArgumentException(sprintf('"%s" must be a finite number.', $numeric));
+            }
+        }
+
         $metadata = $input['metadata'] ?? null;
-        if (null !== $metadata && !is_array($metadata)) {
+        if (null !== $metadata && (!is_array($metadata) || array_is_list($metadata))) {
             throw new \InvalidArgumentException('Element metadata must be an object.');
         }
 
         $element = new CanvasElement(
             $board,
             $author,
-            (string) $input['type'],
+            $input['type'],
             (float) $input['x'],
             (float) $input['y'],
             (float) $input['width'],

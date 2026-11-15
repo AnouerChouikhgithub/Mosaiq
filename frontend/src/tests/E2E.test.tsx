@@ -85,6 +85,7 @@ vi.mock('@/api/client', () => ({
   getBoard: api.getBoard,
   getPublicBoard: vi.fn(),
   createBoard: vi.fn(),
+  updateBoard: vi.fn(),
   toggleStarBoard: vi.fn(),
   getCanvasElements: api.getCanvasElements,
   createCanvasElement: api.createCanvasElement,

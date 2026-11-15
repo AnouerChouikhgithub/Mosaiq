@@ -11,10 +11,10 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
 use Symfony\Component\Security\Http\Authenticator\AbstractAuthenticator;
-use Symfony\Component\Security\Http\EntryPoint\AuthenticationEntryPointInterface;
 use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
-use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
 use Symfony\Component\Security\Http\Authenticator\Passport\Passport;
+use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
+use Symfony\Component\Security\Http\EntryPoint\AuthenticationEntryPointInterface;
 
 final class ApiTokenAuthenticator extends AbstractAuthenticator implements AuthenticationEntryPointInterface
 {
@@ -22,7 +22,7 @@ final class ApiTokenAuthenticator extends AbstractAuthenticator implements Authe
     {
     }
 
-    public function supports(Request $request): ?bool
+    public function supports(Request $request): bool
     {
         return null !== $request->headers->get('Authorization');
     }
@@ -34,9 +34,13 @@ final class ApiTokenAuthenticator extends AbstractAuthenticator implements Authe
             throw new AuthenticationException('Invalid bearer token.');
         }
         $rawToken = $matches[1];
+
         return new SelfValidatingPassport(new UserBadge($rawToken, function (string $token): \Symfony\Component\Security\Core\User\UserInterface {
             $user = $this->users->findByApiTokenHash(hash('sha256', $token));
-            if (null === $user) throw new AuthenticationException('Invalid bearer token.');
+            if (null === $user) {
+                throw new AuthenticationException('Invalid bearer token.');
+            }
+
             return $user;
         }));
     }
@@ -46,7 +50,7 @@ final class ApiTokenAuthenticator extends AbstractAuthenticator implements Authe
         return null;
     }
 
-    public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
+    public function onAuthenticationFailure(Request $request, AuthenticationException $exception): Response
     {
         return new JsonResponse(['error' => 'Authentication required.'], Response::HTTP_UNAUTHORIZED);
     }

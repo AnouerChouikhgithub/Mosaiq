@@ -203,9 +203,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     })
 
     if (!response.ok) {
-      throw new Error(
-        `API ${response.status} ${response.statusText} for ${path}`,
-      )
+      // Surface the API's own message when it sends one; fall back to transport text.
+      let message = `API ${response.status} ${response.statusText} for ${path}`
+      try {
+        const body: unknown = await response.json()
+        if (
+          body &&
+          typeof body === 'object' &&
+          'error' in body &&
+          typeof body.error === 'string' &&
+          body.error.trim()
+        ) {
+          message = body.error
+        }
+      } catch {
+        // Non-JSON error body: keep the transport message.
+      }
+      const error = new Error(message) as Error & { status?: number }
+      error.status = response.status
+      throw error
     }
 
     if (response.status === 204) {
@@ -280,6 +296,16 @@ export async function createBoard(
   return request<ApiBoard>('/boards', {
     method: 'POST',
     body: JSON.stringify({ title, workspaceId: targetWorkspace }),
+  })
+}
+
+export async function updateBoard(
+  id: string,
+  patch: { title?: string; starred?: boolean },
+): Promise<ApiBoard> {
+  return request<ApiBoard>(`/boards/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
   })
 }
 

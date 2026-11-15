@@ -1,6 +1,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import type { ComponentProps } from 'react'
+import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 
 export const Dialog = DialogPrimitive.Root
@@ -18,6 +19,8 @@ export function DialogContent({
   showClose = true,
   ...props
 }: DialogContentProps) {
+  const { t } = useI18n()
+
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-overlay data-[state=open]:animate-fade" />
@@ -32,7 +35,7 @@ export function DialogContent({
         {showClose ? (
           <DialogPrimitive.Close
             className="absolute top-4 right-4 rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            aria-label="Fermer"
+            aria-label={t('common.close')}
           >
             <X className="size-4" aria-hidden="true" />
           </DialogPrimitive.Close>

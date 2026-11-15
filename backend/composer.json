@@ -4,7 +4,7 @@
     "minimum-stability": "stable",
     "prefer-stable": true,
     "require": {
-        "php": ">=8.2",
+        "php": ">=8.3",
         "ext-ctype": "*",
         "ext-iconv": "*",
         "doctrine/dbal": "^4",
@@ -13,7 +13,7 @@
         "doctrine/orm": "^3",
         "symfony/console": "7.4.*",
         "symfony/dotenv": "7.4.*",
-        "symfony/flex": "^2",
+        "symfony/flex": "^2.12",
         "symfony/framework-bundle": "7.4.*",
         "symfony/mailer": "7.4.*",
         "symfony/runtime": "7.4.*",
@@ -67,6 +67,15 @@
         ],
         "post-update-cmd": [
             "@auto-scripts"
+        ],
+        "test": "@php bin/phpunit",
+        "analyse": "@php vendor/bin/phpstan analyse --no-progress",
+        "cs:check": "@php vendor/bin/php-cs-fixer fix --dry-run --diff --using-cache=no",
+        "cs:fix": "@php vendor/bin/php-cs-fixer fix --using-cache=no",
+        "check": [
+            "@test",
+            "@analyse",
+            "@cs:check"
         ]
     },
     "conflict": {

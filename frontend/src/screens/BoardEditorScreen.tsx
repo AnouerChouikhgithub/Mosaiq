@@ -16,7 +16,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   boardCanvas,
@@ -50,6 +50,15 @@ import { ShareDialog } from '@/components/share/ShareDialog'
 import { AvatarStack } from '@/components/ui/avatar-stack'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/input'
 import { Tooltip } from '@/components/ui/tooltip'
 import { useToast } from '@/components/ui/toast-context'
 import { useI18n } from '@/i18n'
@@ -75,6 +84,7 @@ import {
   isRemoteId,
   streamBoardEvents,
   toStickyNote,
+  updateBoard,
   updateCanvasElement,
   warnFallback,
 } from '@/api/client'
@@ -126,6 +136,9 @@ export function BoardEditorScreen({
   const { t, locale } = useI18n()
   const board = boards.find((item) => item.id === boardId)
   const [title, setTitle] = useState(board?.title ?? t('editor.untitled'))
+  const [savedTitle, setSavedTitle] = useState(board?.title ?? t('editor.untitled'))
+  const [titleSaving, setTitleSaving] = useState(false)
+  const [commentDraft, setCommentDraft] = useState<{ x: number; y: number; body: string } | null>(null)
   const [activeTool, setActiveTool] = useState<ToolId>('select')
   const [zoom, setZoom] = useState(0.8)
   const [activeColor, setActiveColor] = useState<NoteColor>('amber')
@@ -164,6 +177,7 @@ export function BoardEditorScreen({
         const loadedBoard = boardResult.value
         setRemoteBoard(loadedBoard)
         setTitle(loadedBoard.title)
+        setSavedTitle(loadedBoard.title)
         setApiAuthorId(getSessionUser()?.id ?? null)
       } else {
         warnFallback('Canvas API', boardResult.reason)
@@ -438,17 +452,62 @@ export function BoardEditorScreen({
   }
 
   function addCommentAt(x: number, y: number) {
-    const body = window.prompt(t('comments.newPrompt'))?.trim()
-    if (!body) return
     if (!apiReady) {
       toast({ title: t('comments.offline') })
       return
     }
-    void createComment(boardId, x, y, body).then((thread) => {
+    setCommentDraft({ x, y, body: '' })
+  }
+
+  async function commitTitle() {
+    const next = title.trim()
+    if (!next) {
+      setTitle(savedTitle)
+      toast({ title: t('editor.titleRequired') })
+      return
+    }
+    if (next === savedTitle) {
+      setTitle(next)
+      return
+    }
+    if (!remoteBoard) {
+      // Demo boards are not persisted; keep the label without claiming a save.
+      setTitle(next)
+      return
+    }
+
+    setTitleSaving(true)
+    try {
+      const updated = await updateBoard(remoteBoard.id, { title: next })
+      setRemoteBoard(updated)
+      setTitle(updated.title)
+      setSavedTitle(updated.title)
+      toast({ title: t('editor.titleSaved') })
+    } catch (error) {
+      warnFallback('Board rename', error)
+      setTitle(savedTitle)
+      toast({ title: t('editor.titleSaveFailed') })
+    } finally {
+      setTitleSaving(false)
+    }
+  }
+
+  async function submitComment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!commentDraft) return
+    const body = commentDraft.body.trim()
+    if (!body) return
+
+    try {
+      const thread = await createComment(boardId, commentDraft.x, commentDraft.y, body)
       setThreads((current) => [...current, toCommentThread(thread)])
       setActiveThreadId(thread.id)
       setCommentsOpen(true)
-    }).catch((error) => warnFallback('Comment create', error))
+      setCommentDraft(null)
+    } catch (error) {
+      warnFallback('Comment create', error)
+      toast({ title: t('comments.createFailed') })
+    }
   }
 
   return (
@@ -466,12 +525,30 @@ export function BoardEditorScreen({
           <input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
+            onBlur={() => void commitTitle()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                event.currentTarget.blur()
+              }
+            }}
             aria-label={t('editor.titleAria')}
             className="h-9 w-40 truncate rounded-lg border border-transparent bg-transparent px-2 text-sm font-semibold transition-colors hover:border-border focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/25 focus-visible:outline-none sm:w-72"
           />
-          <span className="hidden items-center gap-1 text-caption text-muted-foreground sm:flex">
-            <Check className="size-3.5 text-success" aria-hidden="true" />
-            {t('editor.saved')}
+          <span
+            className="hidden items-center gap-1 text-caption text-muted-foreground sm:flex"
+            aria-live="polite"
+          >
+            {titleSaving ? (
+              t('editor.saving')
+            ) : title.trim() === savedTitle ? (
+              <>
+                <Check className="size-3.5 text-success" aria-hidden="true" />
+                {t('editor.saved')}
+              </>
+            ) : (
+              t('editor.unsaved')
+            )}
           </span>
           <Badge
             variant={syncStatus === 'live' ? 'success' : syncStatus === 'syncing' ? 'warning' : 'neutral'}
@@ -732,7 +809,7 @@ export function BoardEditorScreen({
 
           <p className="pointer-events-none absolute bottom-5 left-1/2 hidden -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-surface/95 px-3 py-1.5 text-[11px] text-muted-foreground shadow-card lg:flex">
             <kbd className="rounded border border-border bg-muted px-1">
-              Espace
+              {t('editor.space')}
             </kbd>
             {t('editor.moveHint')} ·
             <kbd className="rounded border border-border bg-muted px-1">
@@ -775,6 +852,45 @@ export function BoardEditorScreen({
         onRemove={(userId) => removeBoardMember(boardId, userId).then(() => setRemoteBoard((current) => current ? { ...current, members: current.members.filter((member) => member.id !== userId) } : current))}
         onPublicAccessChange={(enabled) => setBoardLinkAccess(boardId, enabled).then(setRemoteBoard)}
       />
+
+      <Dialog
+        open={Boolean(commentDraft)}
+        onOpenChange={(open) => {
+          if (!open) setCommentDraft(null)
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('comments.new')}</DialogTitle>
+            <DialogDescription>{t('comments.newBody')}</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitComment} className="flex flex-col gap-3 px-6 pb-2">
+            <Textarea
+              autoFocus
+              value={commentDraft?.body ?? ''}
+              onChange={(event) =>
+                setCommentDraft((current) =>
+                  current ? { ...current, body: event.target.value } : current,
+                )
+              }
+              aria-label={t('comments.newPrompt')}
+              className="min-h-24"
+            />
+            <DialogFooter className="px-0">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setCommentDraft(null)}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button type="submit" disabled={!commentDraft?.body.trim()}>
+                {t('comments.send')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

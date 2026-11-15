@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\Board;
-use App\Entity\CanvasElement;
 use App\Entity\User;
 use App\Entity\Workspace;
 use Doctrine\ORM\EntityManagerInterface;
@@ -70,6 +69,7 @@ abstract class ApiFunctionalTestCase extends WebTestCase
         $user->setApiTokenHash(hash('sha256', $token));
         $this->entityManager->persist($user);
         $this->entityManager->flush();
+
         return $user;
     }
 
@@ -77,7 +77,9 @@ abstract class ApiFunctionalTestCase extends WebTestCase
     protected function requestAs(?string $token, string $method, string $uri, ?array $payload = null): void
     {
         $server = ['CONTENT_TYPE' => 'application/json'];
-        if (null !== $token) $server['HTTP_AUTHORIZATION'] = 'Bearer '.$token;
+        if (null !== $token) {
+            $server['HTTP_AUTHORIZATION'] = 'Bearer '.$token;
+        }
         $this->client->request($method, $uri, server: $server, content: null === $payload ? '' : json_encode($payload, JSON_THROW_ON_ERROR));
     }
 
@@ -86,6 +88,7 @@ abstract class ApiFunctionalTestCase extends WebTestCase
     {
         $decoded = json_decode((string) $this->client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertIsArray($decoded);
+
         return $decoded;
     }
 
@@ -95,6 +98,7 @@ abstract class ApiFunctionalTestCase extends WebTestCase
             'type' => 'note', 'x' => 120, 'y' => 130, 'width' => 220, 'height' => 150, 'content' => $content, 'color' => 'amber',
         ]);
         self::assertResponseStatusCodeSame(201);
+
         return $this->jsonResponse()['id'];
     }
 }

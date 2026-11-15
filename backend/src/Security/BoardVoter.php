@@ -44,6 +44,7 @@ final class BoardVoter extends Voter
         }
 
         $role = $board->roleFor($user);
+
         return match ($attribute) {
             self::VIEW => null !== $role,
             self::COMMENT => in_array($role, ['Owner', 'Admin', 'Editor', 'Commenter'], true),

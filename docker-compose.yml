@@ -1,10 +1,12 @@
 name: mosaiq
 
 # Local development services. Symfony and the frontend run on your machine, not in Docker.
+# Redis is reserved for Symfony Messenger and is not used by the application yet.
 services:
   db:
     container_name: mosaiq-db
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: app
@@ -18,16 +20,25 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 5s
 
   redis:
     container_name: mosaiq-redis
     image: redis:7-alpine
+    restart: unless-stopped
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
 
   mailpit:
     container_name: mosaiq-mailpit
     image: axllent/mailpit
+    restart: unless-stopped
     ports:
       - "1025:1025"
       - "8025:8025"

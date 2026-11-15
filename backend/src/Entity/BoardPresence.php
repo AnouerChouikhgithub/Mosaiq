@@ -47,13 +47,40 @@ class BoardPresence
         $this->update($x, $y, $tool, $now);
     }
 
-    public function getId(): string { return $this->id; }
-    public function getBoard(): Board { return $this->board; }
-    public function getUser(): User { return $this->user; }
-    public function getX(): float { return $this->x; }
-    public function getY(): float { return $this->y; }
-    public function getTool(): string { return $this->tool; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getBoard(): Board
+    {
+        return $this->board;
+    }
+
+    public function getUser(): User
+    {
+        return $this->user;
+    }
+
+    public function getX(): float
+    {
+        return $this->x;
+    }
+
+    public function getY(): float
+    {
+        return $this->y;
+    }
+
+    public function getTool(): string
+    {
+        return $this->tool;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
 
     public function update(float $x, float $y, string $tool, ?\DateTimeImmutable $now = null): void
     {

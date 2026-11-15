@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => {
@@ -30,6 +30,7 @@ const fixture = vi.hoisted(() => {
     getComments: vi.fn(),
     getPresence: vi.fn(),
     streamBoardEvents: vi.fn(),
+    updateBoard: vi.fn(),
   }
 })
 
@@ -44,6 +45,7 @@ vi.mock('@/api/client', async (importOriginal) => {
     getComments: fixture.getComments,
     getPresence: fixture.getPresence,
     streamBoardEvents: fixture.streamBoardEvents,
+    updateBoard: fixture.updateBoard,
   }
 })
 
@@ -71,6 +73,7 @@ beforeEach(() => {
   fixture.getComments.mockReset().mockResolvedValue([])
   fixture.getPresence.mockReset().mockResolvedValue([])
   fixture.streamBoardEvents.mockReset()
+  fixture.updateBoard.mockReset()
 })
 
 afterEach(cleanup)
@@ -97,6 +100,24 @@ describe('live SSE badge', () => {
       expect.any(Function),
       expect.any(AbortSignal),
     )
+  })
+
+  it('persists a renamed board title instead of only changing local state', async () => {
+    fixture.streamBoardEvents.mockImplementation(async () => undefined)
+    fixture.updateBoard.mockResolvedValue({ ...fixture.board, title: 'Titre enregistré' })
+
+    render(<App />)
+
+    const input = await screen.findByLabelText('Titre du tableau')
+    fireEvent.change(input, { target: { value: 'Titre enregistré' } })
+    fireEvent.blur(input)
+
+    await waitFor(() =>
+      expect(fixture.updateBoard).toHaveBeenCalledWith(fixture.board.id, {
+        title: 'Titre enregistré',
+      }),
+    )
+    await screen.findByDisplayValue('Titre enregistré')
   })
 
   it('shows Mode hors ligne when the stream fails while offline', async () => {

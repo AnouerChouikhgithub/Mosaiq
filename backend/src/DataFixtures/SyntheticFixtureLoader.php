@@ -125,22 +125,22 @@ final class SyntheticFixtureLoader
                 'y' => (float) $definition['y'],
             ]);
 
-            if (!$element instanceof CanvasElement) {
-                $metadata = $definition['metadata'] ?? null;
-                if (is_array($metadata)) {
-                    $resolved = [];
-                    foreach (['fromKey', 'toKey'] as $relation) {
-                        if (isset($metadata[$relation])) {
-                            $referenced = $elements[(string) $metadata[$relation]] ?? null;
-                            if (!$referenced instanceof CanvasElement) {
-                                throw new \RuntimeException(sprintf('Unknown connector target "%s".', (string) $metadata[$relation]));
-                            }
-                            $resolved['fromId' === $relation ? 'fromId' : 'toId'] = $referenced->getId();
+            $metadata = $definition['metadata'] ?? null;
+            if (is_array($metadata)) {
+                $resolved = [];
+                foreach (['fromKey', 'toKey'] as $relation) {
+                    if (isset($metadata[$relation])) {
+                        $referenced = $elements[(string) $metadata[$relation]] ?? null;
+                        if (!$referenced instanceof CanvasElement) {
+                            throw new \RuntimeException(sprintf('Unknown connector target "%s".', (string) $metadata[$relation]));
                         }
+                        $resolved['fromKey' === $relation ? 'fromId' : 'toId'] = $referenced->getId();
                     }
-                    $metadata = $resolved;
                 }
+                $metadata = $resolved;
+            }
 
+            if (!$element instanceof CanvasElement) {
                 $element = new CanvasElement(
                     $board,
                     $users[(string) $definition['author']],
@@ -157,6 +157,10 @@ final class SyntheticFixtureLoader
                 );
                 $this->entityManager->persist($element);
                 ++$stats['elements'];
+            } elseif (is_array($metadata) && $element->getMetadata() !== $metadata) {
+                // Repair rows seeded before the connector mapping fix without
+                // deleting anything: a reload rewrites only divergent metadata.
+                $element->updateStyle($element->getColor(), $metadata);
             }
 
             $elements[(string) $definition['key']] = $element;
@@ -277,11 +281,7 @@ final class SyntheticFixtureLoader
         $disposableName = 1 === preg_match('/(test|dev|fixture)/', $database);
 
         if (!in_array($scheme, ['postgres', 'postgresql', 'pgsql'], true) || !$loopback || '' === $database || (!$knownLocalDatabase && !$disposableName)) {
-            throw new \RuntimeException(sprintf(
-                'Refusing to load synthetic fixtures into "%s": expected a loopback PostgreSQL database named mosaiq, or one containing test/dev/fixture.',
-                $this->databaseUrl,
-            ));
+            throw new \RuntimeException(sprintf('Refusing to load synthetic fixtures into "%s": expected a loopback PostgreSQL database named mosaiq, or one containing test/dev/fixture.', $this->databaseUrl));
         }
-
     }
 }

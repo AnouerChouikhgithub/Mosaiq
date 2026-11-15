@@ -1,0 +1,26 @@
+includes:
+    - vendor/phpstan/phpstan/conf/bleedingEdge.neon
+
+parameters:
+    level: 5
+    paths:
+        - src
+        - tests
+
+    # Doctrine assigns identifier values through reflection, so PHPStan cannot
+    # see the write. Ignored only for entity identifiers, not for other
+    # properties. Remove this block if phpstan/phpstan-doctrine is approved.
+    ignoreErrors:
+        -
+            message: '#Property App\\Entity\\\w+::\$id is never written, only read\.#'
+            identifier: property.onlyRead
+            paths:
+                - src/Entity/*.php
+
+        # Invitations deliberately keep the hashed token and the inviter
+        # write-only: no code path may read them back after persistence.
+        -
+            message: '#Property App\\Entity\\BoardInvitation::\$(invitedBy|tokenHash) is never read, only written\.#'
+            identifier: property.onlyWritten
+            paths:
+                - src/Entity/BoardInvitation.php

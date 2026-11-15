@@ -49,9 +49,15 @@ class BoardInvitation
     public function __construct(Board $board, User $invitedBy, string $email, string $role, string $tokenHash, ?\DateTimeImmutable $now = null)
     {
         $email = strtolower(trim($email));
-        if (false === filter_var($email, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invitation email is invalid.');
-        if (!in_array($role, ['Viewer', 'Commenter', 'Editor'], true)) throw new \InvalidArgumentException('Invitation role is not supported.');
-        if (1 !== preg_match('/^[a-f0-9]{64}$/', $tokenHash)) throw new \InvalidArgumentException('Invitation token hash is invalid.');
+        if (false === filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException('Invitation email is invalid.');
+        }
+        if (!in_array($role, ['Viewer', 'Commenter', 'Editor'], true)) {
+            throw new \InvalidArgumentException('Invitation role is not supported.');
+        }
+        if (1 !== preg_match('/^[a-f0-9]{64}$/', $tokenHash)) {
+            throw new \InvalidArgumentException('Invitation token hash is invalid.');
+        }
         $this->board = $board;
         $this->invitedBy = $invitedBy;
         $this->email = $email;
@@ -61,17 +67,51 @@ class BoardInvitation
         $this->expiresAt = $this->createdAt->modify('+7 days');
     }
 
-    public function getId(): string { return $this->id; }
-    public function getBoard(): Board { return $this->board; }
-    public function getEmail(): string { return $this->email; }
-    public function getRole(): string { return $this->role; }
-    public function getExpiresAt(): \DateTimeImmutable { return $this->expiresAt; }
-    public function getAcceptedAt(): ?\DateTimeImmutable { return $this->acceptedAt; }
-    public function matchesEmail(string $email): bool { return hash_equals($this->email, strtolower(trim($email))); }
-    public function isPendingAt(?\DateTimeImmutable $now = null): bool { return null === $this->acceptedAt && $this->expiresAt > ($now ?? new \DateTimeImmutable()); }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getBoard(): Board
+    {
+        return $this->board;
+    }
+
+    public function getEmail(): string
+    {
+        return $this->email;
+    }
+
+    public function getRole(): string
+    {
+        return $this->role;
+    }
+
+    public function getExpiresAt(): \DateTimeImmutable
+    {
+        return $this->expiresAt;
+    }
+
+    public function getAcceptedAt(): ?\DateTimeImmutable
+    {
+        return $this->acceptedAt;
+    }
+
+    public function matchesEmail(string $email): bool
+    {
+        return hash_equals($this->email, strtolower(trim($email)));
+    }
+
+    public function isPendingAt(?\DateTimeImmutable $now = null): bool
+    {
+        return null === $this->acceptedAt && $this->expiresAt > ($now ?? new \DateTimeImmutable());
+    }
+
     public function accept(?\DateTimeImmutable $now = null): void
     {
-        if (!$this->isPendingAt($now)) throw new \InvalidArgumentException('Invitation is expired or already accepted.');
+        if (!$this->isPendingAt($now)) {
+            throw new \InvalidArgumentException('Invitation is expired or already accepted.');
+        }
         $this->acceptedAt = $now ?? new \DateTimeImmutable();
     }
 }

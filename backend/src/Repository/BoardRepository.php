@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\Board;
-use App\Entity\Workspace;
 use App\Entity\User;
+use App\Entity\Workspace;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -50,10 +50,16 @@ class BoardRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Listing is limited to boards the user belongs to plus, for workspace
+     * administrators, every board in their own workspace. Public boards from
+     * other workspaces stay reachable through their direct link only: they must
+     * not turn the dashboard into a cross-workspace directory.
+     */
     private function queryAccessible(User $user): \Doctrine\ORM\QueryBuilder
     {
         return $this->createQueryBuilder('board')
-            ->andWhere('EXISTS (SELECT membership.role FROM App\\Entity\\BoardMembership membership WHERE membership.board = board AND membership.user = :user) OR (board.workspace = :workspace AND :isAdmin = true) OR board.publicAccess = true')
+            ->andWhere('EXISTS (SELECT membership.role FROM App\\Entity\\BoardMembership membership WHERE membership.board = board AND membership.user = :user) OR (board.workspace = :workspace AND :isAdmin = true)')
             ->setParameter('user', $user)
             ->setParameter('workspace', $user->getWorkspace())
             ->setParameter('isAdmin', $user->canAdministerWorkspace());

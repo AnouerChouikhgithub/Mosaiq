@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\Board;
+use App\Entity\BoardInvitation;
 use App\Entity\User;
 use App\Entity\Workspace;
-use App\Repository\BoardRepository;
 use App\Repository\BoardInvitationRepository;
-use App\Entity\BoardInvitation;
+use App\Repository\BoardRepository;
 use App\Repository\UserRepository;
 use App\Repository\WorkspaceRepository;
+use App\Service\BoardInvitationMailer;
 use App\Service\BoardSerializer;
 use App\Service\BoardService;
-use App\Service\BoardInvitationMailer;
 use App\Service\TimelineService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -48,10 +48,17 @@ final class BoardApiController extends AbstractController
         $workspaceId = $request->query->get('workspaceId');
         if (null !== $workspaceId && '' !== $workspaceId) {
             $workspace = $this->workspaces->find($workspaceId);
-            if (!$workspace instanceof Workspace) return $this->json(['error' => 'Workspace not found.'], 404);
-            if ($workspace->getId() !== $user->getWorkspace()->getId()) return $this->json(['error' => 'Forbidden.'], 403);
-            try { $this->denyAccessUnlessGranted('WORKSPACE_VIEW', $workspace); }
-            catch (AccessDeniedException) { return $this->json(['error' => 'Forbidden.'], 403); }
+            if (!$workspace instanceof Workspace) {
+                return $this->json(['error' => 'Workspace not found.'], 404);
+            }
+            if ($workspace->getId() !== $user->getWorkspace()->getId()) {
+                return $this->json(['error' => 'Forbidden.'], 403);
+            }
+            try {
+                $this->denyAccessUnlessGranted('WORKSPACE_VIEW', $workspace);
+            } catch (AccessDeniedException) {
+                return $this->json(['error' => 'Forbidden.'], 403);
+            }
             $boards = $this->boards->findAccessibleInWorkspace($user, $workspace);
         } else {
             $boards = $this->boards->findAccessibleTo($user);
@@ -67,13 +74,17 @@ final class BoardApiController extends AbstractController
         try {
             $payload = $this->decodePayload($request);
             $workspace = $this->workspaces->find((string) ($payload['workspaceId'] ?? $user->getWorkspace()->getId()));
-            if (!$workspace instanceof Workspace) return $this->json(['error' => 'Workspace not found.'], 404);
+            if (!$workspace instanceof Workspace) {
+                return $this->json(['error' => 'Workspace not found.'], 404);
+            }
             $this->denyAccessUnlessGranted('WORKSPACE_VIEW', $workspace);
             $colors = $payload['noteColors'] ?? ['amber', 'sky', 'mint'];
-            if (!is_array($colors) || array_filter($colors, static fn ($color): bool => !is_string($color)) !== []) {
+            if (!is_array($colors) || [] !== array_filter($colors, static fn ($color): bool => !is_string($color))) {
                 throw new \InvalidArgumentException('noteColors must be an array of color names.');
             }
-            if (!$this->isGranted('WORKSPACE_ADMINISTER', $workspace)) throw new AccessDeniedException('Only workspace administrators can create boards.');
+            if (!$this->isGranted('WORKSPACE_ADMINISTER', $workspace)) {
+                throw new AccessDeniedException('Only workspace administrators can create boards.');
+            }
             $board = $this->boardService->createBoard($workspace, (string) ($payload['title'] ?? ''), array_values($colors), $user);
             $board->addMember($user, 'Owner');
             $this->timeline->record($board, $user, sprintf('%s created the board', $user->getName()), 'board');
@@ -92,12 +103,19 @@ final class BoardApiController extends AbstractController
     public function show(string $id): JsonResponse
     {
         $board = $this->boards->find($id);
-        if (!$board instanceof Board) return $this->json(['error' => 'Board not found.'], 404);
-        try { $this->denyAccessUnlessGranted('BOARD_VIEW', $board); }
-        catch (AccessDeniedException) {
-            if (!$board->hasPublicAccess()) return $this->json(['error' => 'Forbidden.'], 403);
+        if (!$board instanceof Board) {
+            return $this->json(['error' => 'Board not found.'], 404);
+        }
+        try {
+            $this->denyAccessUnlessGranted('BOARD_VIEW', $board);
+        } catch (AccessDeniedException) {
+            if (!$board->hasPublicAccess()) {
+                return $this->json(['error' => 'Forbidden.'], 403);
+            }
+
             return $this->json($this->serializer->publicDetail($board));
         }
+
         return $this->json($this->serializer->detail($board));
     }
 
@@ -105,7 +123,9 @@ final class BoardApiController extends AbstractController
     public function update(string $id, Request $request): JsonResponse
     {
         $board = $this->boards->find($id);
-        if (!$board instanceof Board) return $this->json(['error' => 'Board not found.'], 404);
+        if (!$board instanceof Board) {
+            return $this->json(['error' => 'Board not found.'], 404);
+        }
         try {
             $this->denyAccessUnlessGranted('BOARD_EDIT', $board);
             $user = $this->requireUser();
@@ -114,7 +134,9 @@ final class BoardApiController extends AbstractController
                 $this->boardService->renameBoard($board, (string) $payload['title']);
                 $this->timeline->record($board, $user, sprintf('%s renamed the board', $user->getName()), 'rename');
             }
-            if (array_key_exists('starred', $payload)) $this->boardService->setStarred($board, (bool) $payload['starred']);
+            if (array_key_exists('starred', $payload)) {
+                $this->boardService->setStarred($board, (bool) $payload['starred']);
+            }
         } catch (\JsonException) {
             return $this->json(['error' => 'Malformed JSON payload.'], 400);
         } catch (\InvalidArgumentException $exception) {
@@ -122,6 +144,7 @@ final class BoardApiController extends AbstractController
         } catch (AccessDeniedException) {
             return $this->json(['error' => 'Forbidden.'], 403);
         }
+
         return $this->json($this->serializer->detail($board));
     }
 
@@ -129,10 +152,16 @@ final class BoardApiController extends AbstractController
     public function toggleStar(string $id): JsonResponse
     {
         $board = $this->boards->find($id);
-        if (!$board instanceof Board) return $this->json(['error' => 'Board not found.'], 404);
-        try { $this->denyAccessUnlessGranted('BOARD_VIEW', $board); }
-        catch (AccessDeniedException) { return $this->json(['error' => 'Forbidden.'], 403); }
+        if (!$board instanceof Board) {
+            return $this->json(['error' => 'Board not found.'], 404);
+        }
+        try {
+            $this->denyAccessUnlessGranted('BOARD_VIEW', $board);
+        } catch (AccessDeniedException) {
+            return $this->json(['error' => 'Forbidden.'], 403);
+        }
         $this->boardService->setStarred($board, !$board->isStarred());
+
         return $this->json($this->serializer->detail($board));
     }
 
@@ -140,12 +169,19 @@ final class BoardApiController extends AbstractController
     public function timeline(string $id): JsonResponse
     {
         $board = $this->boards->find($id);
-        if (!$board instanceof Board) return $this->json(['error' => 'Board not found.'], 404);
-        try { $this->denyAccessUnlessGranted('BOARD_VIEW', $board); }
-        catch (AccessDeniedException) {
-            if (!$board->hasPublicAccess()) return $this->json(['error' => 'Forbidden.'], 403);
+        if (!$board instanceof Board) {
+            return $this->json(['error' => 'Board not found.'], 404);
+        }
+        try {
+            $this->denyAccessUnlessGranted('BOARD_VIEW', $board);
+        } catch (AccessDeniedException) {
+            if (!$board->hasPublicAccess()) {
+                return $this->json(['error' => 'Forbidden.'], 403);
+            }
+
             return $this->json(['timeline' => []]);
         }
+
         return $this->json(['timeline' => array_map(static fn ($entry): array => [
             'id' => $entry->getId(),
             'at' => $entry->getAt()->format(DATE_ATOM),
@@ -161,12 +197,20 @@ final class BoardApiController extends AbstractController
     public function restore(string $id, string $timelineEntryId): JsonResponse
     {
         $board = $this->boards->find($id);
-        if (!$board instanceof Board) return $this->json(['error' => 'Board not found.'], 404);
+        if (!$board instanceof Board) {
+            return $this->json(['error' => 'Board not found.'], 404);
+        }
         try {
             $this->denyAccessUnlessGranted('BOARD_EDIT', $board);
             $entry = null;
-            foreach ($this->timeline->forBoard($board) as $candidate) if ($candidate->getId() === $timelineEntryId) $entry = $candidate;
-            if (null === $entry) return $this->json(['error' => 'Timeline entry not found.'], 404);
+            foreach ($this->timeline->forBoard($board) as $candidate) {
+                if ($candidate->getId() === $timelineEntryId) {
+                    $entry = $candidate;
+                }
+            }
+            if (null === $entry) {
+                return $this->json(['error' => 'Timeline entry not found.'], 404);
+            }
             $user = $this->requireUser();
             $this->timeline->restore($board, $entry, $user);
         } catch (AccessDeniedException) {
@@ -174,6 +218,7 @@ final class BoardApiController extends AbstractController
         } catch (\InvalidArgumentException $exception) {
             return $this->json(['error' => $exception->getMessage()], 422);
         }
+
         return $this->json($this->serializer->detail($board));
     }
 
@@ -181,20 +226,32 @@ final class BoardApiController extends AbstractController
     public function addMember(string $id, Request $request): JsonResponse
     {
         $board = $this->boards->find($id);
-        if (!$board instanceof Board) return $this->json(['error' => 'Board not found.'], 404);
+        if (!$board instanceof Board) {
+            return $this->json(['error' => 'Board not found.'], 404);
+        }
         try {
             $this->denyAccessUnlessGranted('BOARD_SHARE', $board);
             $payload = $this->decodePayload($request);
             $user = $this->users->findByEmail((string) ($payload['email'] ?? ''));
             $role = (string) ($payload['role'] ?? 'Viewer');
-            if (!$user instanceof User) return $this->json(['error' => 'User not found.'], 404);
-            if (!in_array($role, ['Viewer', 'Commenter', 'Editor'], true)) throw new \InvalidArgumentException('Share role is not supported.');
-            if ($user->getWorkspace()->getId() !== $board->getWorkspace()->getId()) return $this->json(['error' => 'User must belong to the board workspace.'], 422);
+            if (!$user instanceof User) {
+                return $this->json(['error' => 'User not found.'], 404);
+            }
+            if (!in_array($role, ['Viewer', 'Commenter', 'Editor'], true)) {
+                throw new \InvalidArgumentException('Share role is not supported.');
+            }
+            if ($user->getWorkspace()->getId() !== $board->getWorkspace()->getId()) {
+                return $this->json(['error' => 'User must belong to the board workspace.'], 422);
+            }
             $board->addMember($user, $role);
             $this->entityManager->flush();
             $this->invitationMailer->send($user->getEmail(), $board->getTitle(), $this->requireUser()->getName(), $role);
-        } catch (AccessDeniedException) { return $this->json(['error' => 'Forbidden.'], 403); }
-        catch (\JsonException|\InvalidArgumentException $exception) { return $this->json(['error' => $exception->getMessage()], 422); }
+        } catch (AccessDeniedException) {
+            return $this->json(['error' => 'Forbidden.'], 403);
+        } catch (\JsonException|\InvalidArgumentException $exception) {
+            return $this->json(['error' => $exception->getMessage()], 422);
+        }
+
         return $this->json($this->serializer->summary($board), 200);
     }
 
@@ -202,23 +259,33 @@ final class BoardApiController extends AbstractController
     public function createInvitation(string $id, Request $request): JsonResponse
     {
         $board = $this->boards->find($id);
-        if (!$board instanceof Board) return $this->json(['error' => 'Board not found.'], 404);
+        if (!$board instanceof Board) {
+            return $this->json(['error' => 'Board not found.'], 404);
+        }
         try {
             $this->denyAccessUnlessGranted('BOARD_SHARE', $board);
             $actor = $this->requireUser();
             $payload = $this->decodePayload($request);
             $email = strtolower(trim((string) ($payload['email'] ?? '')));
             $role = (string) ($payload['role'] ?? 'Viewer');
-            if (false === filter_var($email, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invitation email is invalid.');
-            if (!in_array($role, ['Viewer', 'Commenter', 'Editor'], true)) throw new \InvalidArgumentException('Share role is not supported.');
+            if (false === filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new \InvalidArgumentException('Invitation email is invalid.');
+            }
+            if (!in_array($role, ['Viewer', 'Commenter', 'Editor'], true)) {
+                throw new \InvalidArgumentException('Share role is not supported.');
+            }
             $token = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
             $invitation = new BoardInvitation($board, $actor, $email, $role, hash('sha256', $token));
             $this->entityManager->persist($invitation);
             $this->entityManager->flush();
             $emailSent = $this->invitationMailer->send($email, $board->getTitle(), $actor->getName(), $role, $token);
+
             return $this->json(['token' => $token, 'email' => $email, 'role' => $role, 'expiresAt' => $invitation->getExpiresAt()->format(DATE_ATOM), 'emailSent' => $emailSent], 201);
-        } catch (AccessDeniedException) { return $this->json(['error' => 'Forbidden.'], 403); }
-        catch (\JsonException|\InvalidArgumentException $exception) { return $this->json(['error' => $exception->getMessage()], 422); }
+        } catch (AccessDeniedException) {
+            return $this->json(['error' => 'Forbidden.'], 403);
+        } catch (\JsonException|\InvalidArgumentException $exception) {
+            return $this->json(['error' => $exception->getMessage()], 422);
+        }
     }
 
     #[Route('/{id}/members/{userId}', name: 'members_update', methods: ['PATCH'])]
@@ -226,18 +293,30 @@ final class BoardApiController extends AbstractController
     {
         $board = $this->boards->find($id);
         $member = $this->users->find($userId);
-        if (!$board instanceof Board || !$member instanceof User) return $this->json(['error' => 'Board or user not found.'], 404);
+        if (!$board instanceof Board || !$member instanceof User) {
+            return $this->json(['error' => 'Board or user not found.'], 404);
+        }
         try {
             $this->denyAccessUnlessGranted('BOARD_SHARE', $board);
             $payload = $this->decodePayload($request);
             $role = (string) ($payload['role'] ?? '');
-            if (!in_array($role, ['Viewer', 'Commenter', 'Editor'], true)) throw new \InvalidArgumentException('Share role is not supported.');
-            if ($member->getWorkspace()->getId() !== $board->getWorkspace()->getId() || !$board->isMember($member)) return $this->json(['error' => 'Board member not found.'], 404);
-            if ('Owner' === $board->roleFor($member)) return $this->json(['error' => 'Cannot change the board owner role.'], 422);
+            if (!in_array($role, ['Viewer', 'Commenter', 'Editor'], true)) {
+                throw new \InvalidArgumentException('Share role is not supported.');
+            }
+            if ($member->getWorkspace()->getId() !== $board->getWorkspace()->getId() || !$board->isMember($member)) {
+                return $this->json(['error' => 'Board member not found.'], 404);
+            }
+            if ('Owner' === $board->roleFor($member)) {
+                return $this->json(['error' => 'Cannot change the board owner role.'], 422);
+            }
             $board->addMember($member, $role);
             $this->entityManager->flush();
-        } catch (AccessDeniedException) { return $this->json(['error' => 'Forbidden.'], 403); }
-        catch (\JsonException|\InvalidArgumentException $exception) { return $this->json(['error' => $exception->getMessage()], 422); }
+        } catch (AccessDeniedException) {
+            return $this->json(['error' => 'Forbidden.'], 403);
+        } catch (\JsonException|\InvalidArgumentException $exception) {
+            return $this->json(['error' => $exception->getMessage()], 422);
+        }
+
         return $this->json($this->serializer->summary($board));
     }
 
@@ -246,12 +325,20 @@ final class BoardApiController extends AbstractController
     {
         $board = $this->boards->find($id);
         $member = $this->users->find($userId);
-        if (!$board instanceof Board || !$member instanceof User) return $this->json(['error' => 'Board or user not found.'], 404);
-        try { $this->denyAccessUnlessGranted('BOARD_SHARE', $board); }
-        catch (AccessDeniedException) { return $this->json(['error' => 'Forbidden.'], 403); }
-        if ('Owner' === $board->roleFor($member)) return $this->json(['error' => 'Cannot remove the board owner.'], 422);
+        if (!$board instanceof Board || !$member instanceof User) {
+            return $this->json(['error' => 'Board or user not found.'], 404);
+        }
+        try {
+            $this->denyAccessUnlessGranted('BOARD_SHARE', $board);
+        } catch (AccessDeniedException) {
+            return $this->json(['error' => 'Forbidden.'], 403);
+        }
+        if ('Owner' === $board->roleFor($member)) {
+            return $this->json(['error' => 'Cannot remove the board owner.'], 422);
+        }
         $board->removeMember($member);
         $this->entityManager->flush();
+
         return new JsonResponse(null, 204);
     }
 
@@ -260,10 +347,16 @@ final class BoardApiController extends AbstractController
     {
         $actor = $this->requireUser();
         $invitation = $this->invitations->findByToken($token);
-        if (!$invitation instanceof BoardInvitation || !$invitation->isPendingAt()) return $this->json(['error' => 'Invitation is invalid, expired or already accepted.'], 404);
+        if (!$invitation instanceof BoardInvitation || !$invitation->isPendingAt()) {
+            return $this->json(['error' => 'Invitation is invalid, expired or already accepted.'], 404);
+        }
         $board = $invitation->getBoard();
-        if (!$invitation->matchesEmail($actor->getEmail())) return $this->json(['error' => 'Invitation belongs to another email address.'], 403);
-        if ($actor->getWorkspace()->getId() !== $board->getWorkspace()->getId()) return $this->json(['error' => 'Account must belong to the board workspace.'], 403);
+        if (!$invitation->matchesEmail($actor->getEmail())) {
+            return $this->json(['error' => 'Invitation belongs to another email address.'], 403);
+        }
+        if ($actor->getWorkspace()->getId() !== $board->getWorkspace()->getId()) {
+            return $this->json(['error' => 'Account must belong to the board workspace.'], 403);
+        }
         try {
             $this->entityManager->wrapInTransaction(function () use ($invitation, $board, $actor): void {
                 $invitation->accept();
@@ -273,6 +366,7 @@ final class BoardApiController extends AbstractController
         } catch (\InvalidArgumentException) {
             return $this->json(['error' => 'Invitation is invalid, expired or already accepted.'], 404);
         }
+
         return $this->json($this->serializer->detail($board));
     }
 
@@ -280,22 +374,33 @@ final class BoardApiController extends AbstractController
     public function updateAccess(string $id, Request $request): JsonResponse
     {
         $board = $this->boards->find($id);
-        if (!$board instanceof Board) return $this->json(['error' => 'Board not found.'], 404);
+        if (!$board instanceof Board) {
+            return $this->json(['error' => 'Board not found.'], 404);
+        }
         try {
             $this->denyAccessUnlessGranted('BOARD_SHARE', $board);
             $payload = $this->decodePayload($request);
-            if (!is_bool($payload['publicAccess'] ?? null)) throw new \InvalidArgumentException('publicAccess must be boolean.');
+            if (!is_bool($payload['publicAccess'] ?? null)) {
+                throw new \InvalidArgumentException('publicAccess must be boolean.');
+            }
             $board->setPublicAccess($payload['publicAccess']);
             $this->entityManager->flush();
-        } catch (AccessDeniedException) { return $this->json(['error' => 'Forbidden.'], 403); }
-        catch (\JsonException|\InvalidArgumentException $exception) { return $this->json(['error' => $exception->getMessage()], 422); }
+        } catch (AccessDeniedException) {
+            return $this->json(['error' => 'Forbidden.'], 403);
+        } catch (\JsonException|\InvalidArgumentException $exception) {
+            return $this->json(['error' => $exception->getMessage()], 422);
+        }
+
         return $this->json($this->serializer->summary($board));
     }
 
     private function requireUser(): User
     {
         $user = $this->getUser();
-        if (!$user instanceof User) throw new AccessDeniedException('Authentication required.');
+        if (!$user instanceof User) {
+            throw new AccessDeniedException('Authentication required.');
+        }
+
         return $user;
     }
 }

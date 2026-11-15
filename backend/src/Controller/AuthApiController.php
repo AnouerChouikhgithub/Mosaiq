@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Entity\User;
 use App\Entity\BoardInvitation;
+use App\Entity\User;
 use App\Entity\Workspace;
-use App\Repository\UserRepository;
-use App\Repository\WorkspaceRepository;
 use App\Repository\BoardInvitationRepository;
+use App\Repository\UserRepository;
 use App\Service\CanvasSerializer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,7 +23,6 @@ final class AuthApiController extends AbstractController
 
     public function __construct(
         private readonly UserRepository $users,
-        private readonly WorkspaceRepository $workspaces,
         private readonly BoardInvitationRepository $invitations,
         private readonly EntityManagerInterface $entityManager,
         private readonly CanvasSerializer $serializer,
@@ -66,7 +64,7 @@ final class AuthApiController extends AbstractController
             }
 
             $invitation = '' !== $inviteToken ? $this->invitations->findByToken($inviteToken) : null;
-            if ('' !== $inviteToken && (!$invitation instanceof \App\Entity\BoardInvitation || !$invitation->isPendingAt() || !$invitation->matchesEmail($email))) {
+            if ('' !== $inviteToken && (!$invitation instanceof BoardInvitation || !$invitation->isPendingAt() || !$invitation->matchesEmail($email))) {
                 return $this->json(['error' => 'Invitation is invalid, expired or belongs to another email.'], 422);
             }
             $workspace = $invitation?->getBoard()->getWorkspace();
@@ -79,7 +77,7 @@ final class AuthApiController extends AbstractController
             $user = new User($workspace, $email, $name, $invitation instanceof BoardInvitation ? 'Viewer' : 'Owner', 'Tunis', 'cursor-1');
             $user->setPasswordHash(password_hash($password, PASSWORD_DEFAULT));
             $this->entityManager->persist($user);
-            if ($invitation instanceof \App\Entity\BoardInvitation) {
+            if ($invitation instanceof BoardInvitation) {
                 $invitation->accept();
                 $invitation->getBoard()->addMember($user, $invitation->getRole());
             }
@@ -95,6 +93,7 @@ final class AuthApiController extends AbstractController
     public function me(): JsonResponse
     {
         $user = $this->getUser();
+
         return $user instanceof User ? $this->json($this->profile($user)) : $this->json(['error' => 'Authentication required.'], 401);
     }
 
@@ -102,9 +101,12 @@ final class AuthApiController extends AbstractController
     public function logout(): JsonResponse
     {
         $user = $this->getUser();
-        if (!$user instanceof User) return $this->json(['error' => 'Authentication required.'], 401);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Authentication required.'], 401);
+        }
         $user->setApiTokenHash(null);
         $this->entityManager->flush();
+
         return $this->json(['loggedOut' => true]);
     }
 
@@ -113,6 +115,7 @@ final class AuthApiController extends AbstractController
         $token = rtrim(strtr(base64_encode(random_bytes(48)), '+/', '-_'), '=');
         $user->setApiTokenHash(hash('sha256', $token));
         $this->entityManager->flush();
+
         return $this->json(['token' => $token] + $this->profile($user), $status);
     }
 
@@ -120,6 +123,7 @@ final class AuthApiController extends AbstractController
     private function profile(User $user): array
     {
         $workspace = $user->getWorkspace();
+
         return [
             'user' => $this->serializer->user($user),
             'workspace' => ['id' => $workspace->getId(), 'name' => $workspace->getName(), 'plan' => $workspace->getPlan()],

@@ -69,10 +69,16 @@ class Board
     /** @param list<string> $noteColors */
     public function __construct(Workspace $workspace, string $title, array $noteColors = ['amber', 'sky', 'mint'], bool $isTemplate = false, ?\DateTimeImmutable $now = null)
     {
-        if ('' === trim($title)) throw new \InvalidArgumentException('Board title is required.');
-        if ([] === $noteColors) throw new \InvalidArgumentException('A board needs at least one note color.');
+        if ('' === trim($title)) {
+            throw new \InvalidArgumentException('Board title is required.');
+        }
+        if ([] === $noteColors) {
+            throw new \InvalidArgumentException('A board needs at least one note color.');
+        }
         foreach ($noteColors as $color) {
-            if (!in_array($color, self::NOTE_COLORS, true)) throw new \InvalidArgumentException(sprintf('Note color "%s" is not supported.', (string) $color));
+            if (!in_array($color, self::NOTE_COLORS, true)) {
+                throw new \InvalidArgumentException(sprintf('Note color "%s" is not supported.', (string) $color));
+            }
         }
 
         $now ??= new \DateTimeImmutable();
@@ -88,21 +94,87 @@ class Board
         $this->timelineEntries = new ArrayCollection();
     }
 
-    public function getId(): string { return $this->id; }
-    public function getWorkspace(): Workspace { return $this->workspace; }
-    public function getTitle(): string { return $this->title; }
-    public function isStarred(): bool { return $this->starred; }
-    public function isTemplate(): bool { return $this->isTemplate; }
-    /** @return list<string> */ public function getNoteColors(): array { return $this->noteColors; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
-    /** @return Collection<int, BoardMembership> */ public function getMemberships(): Collection { return $this->memberships; }
-    /** @return Collection<int, User> */ public function getMembers(): Collection { return new ArrayCollection(array_map(static fn (BoardMembership $membership): User => $membership->getUser(), $this->memberships->toArray())); }
-    /** @return Collection<int, CanvasElement> */ public function getElements(): Collection { return $this->elements; }
-    /** @return Collection<int, CommentThread> */ public function getCommentThreads(): Collection { return $this->commentThreads; }
-    /** @return Collection<int, TimelineEntry> */ public function getTimelineEntries(): Collection { return $this->timelineEntries; }
-    public function hasPublicAccess(): bool { return $this->publicAccess; }
-    public function setPublicAccess(bool $publicAccess): void { $this->publicAccess = $publicAccess; $this->touch(); }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getWorkspace(): Workspace
+    {
+        return $this->workspace;
+    }
+
+    public function getTitle(): string
+    {
+        return $this->title;
+    }
+
+    public function isStarred(): bool
+    {
+        return $this->starred;
+    }
+
+    public function isTemplate(): bool
+    {
+        return $this->isTemplate;
+    }
+
+    /** @return list<string> */
+    public function getNoteColors(): array
+    {
+        return $this->noteColors;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
+
+    /** @return Collection<int, BoardMembership> */
+    public function getMemberships(): Collection
+    {
+        return $this->memberships;
+    }
+
+    /** @return Collection<int, User> */
+    public function getMembers(): Collection
+    {
+        return new ArrayCollection(array_map(static fn (BoardMembership $membership): User => $membership->getUser(), $this->memberships->toArray()));
+    }
+
+    /** @return Collection<int, CanvasElement> */
+    public function getElements(): Collection
+    {
+        return $this->elements;
+    }
+
+    /** @return Collection<int, CommentThread> */
+    public function getCommentThreads(): Collection
+    {
+        return $this->commentThreads;
+    }
+
+    /** @return Collection<int, TimelineEntry> */
+    public function getTimelineEntries(): Collection
+    {
+        return $this->timelineEntries;
+    }
+
+    public function hasPublicAccess(): bool
+    {
+        return $this->publicAccess;
+    }
+
+    public function setPublicAccess(bool $publicAccess): void
+    {
+        $this->publicAccess = $publicAccess;
+        $this->touch();
+    }
 
     public function addMember(User $member, ?string $role = null): void
     {
@@ -110,6 +182,7 @@ class Board
         foreach ($this->memberships as $membership) {
             if ($membership->getUser()->getId() === $member->getId()) {
                 $membership->changeRole($role);
+
                 return;
             }
         }
@@ -119,26 +192,50 @@ class Board
     public function removeMember(User $member): void
     {
         foreach ($this->memberships as $membership) {
-            if ($membership->getUser()->getId() === $member->getId()) $this->memberships->removeElement($membership);
+            if ($membership->getUser()->getId() === $member->getId()) {
+                $this->memberships->removeElement($membership);
+            }
         }
     }
 
-    public function isMember(User $user): bool { return null !== $this->membershipFor($user); }
-    public function roleFor(User $user): ?string { return $this->membershipFor($user)?->getRole(); }
+    public function isMember(User $user): bool
+    {
+        return null !== $this->membershipFor($user);
+    }
+
+    public function roleFor(User $user): ?string
+    {
+        return $this->membershipFor($user)?->getRole();
+    }
 
     private function membershipFor(User $user): ?BoardMembership
     {
-        foreach ($this->memberships as $membership) if ($membership->getUser()->getId() === $user->getId()) return $membership;
+        foreach ($this->memberships as $membership) {
+            if ($membership->getUser()->getId() === $user->getId()) {
+                return $membership;
+            }
+        }
+
         return null;
     }
 
     public function rename(string $title, ?\DateTimeImmutable $now = null): void
     {
-        if ('' === trim($title)) throw new \InvalidArgumentException('Board title is required.');
+        if ('' === trim($title)) {
+            throw new \InvalidArgumentException('Board title is required.');
+        }
         $this->title = trim($title);
         $this->touch($now);
     }
 
-    public function setStarred(bool $starred, ?\DateTimeImmutable $now = null): void { $this->starred = $starred; $this->touch($now); }
-    public function touch(?\DateTimeImmutable $now = null): void { $this->updatedAt = $now ?? new \DateTimeImmutable(); }
+    public function setStarred(bool $starred, ?\DateTimeImmutable $now = null): void
+    {
+        $this->starred = $starred;
+        $this->touch($now);
+    }
+
+    public function touch(?\DateTimeImmutable $now = null): void
+    {
+        $this->updatedAt = $now ?? new \DateTimeImmutable();
+    }
 }

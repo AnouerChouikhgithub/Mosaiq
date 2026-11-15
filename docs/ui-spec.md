@@ -1,5 +1,11 @@
 # UI specification (source of truth for all screens)
 
+> **Implementation status (2026-11-15).** The visual and interaction requirements below remain
+> authoritative. The “typed mock data only / no backend calls yet” phase was superseded: the app
+> now loads boards, canvas, comments, sharing, presence and replay from the Symfony API and keeps
+> typed mocks only as an offline demo fallback. Do not remove that integration to satisfy the
+> original mock-only instruction; see `AGENTS.md` and `docs/technical-audit.md`.
+
 INSTRUCTIONS FOR THE CODING AGENT
 - Implement the screens below as real, working code in `frontend/`. Wording such as "generate" or "visual reference" means: build them in the codebase.
 - Work in the batches the developer asks for. Never skip, merge or summarize screens inside a requested batch.

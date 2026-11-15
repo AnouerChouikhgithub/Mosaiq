@@ -39,12 +39,18 @@ final class CanvasApiController extends AbstractController
     public function index(string $boardId): JsonResponse
     {
         $board = $this->boards->find($boardId);
-        if (!$board instanceof Board) return $this->json(['error' => 'Board not found.'], 404);
-        try { $this->denyAccessUnlessGranted('BOARD_VIEW', $board); }
-        catch (AccessDeniedException) {
-            if (!$board->hasPublicAccess()) return $this->json(['error' => 'Forbidden.'], 403);
+        if (!$board instanceof Board) {
+            return $this->json(['error' => 'Board not found.'], 404);
+        }
+        try {
+            $this->denyAccessUnlessGranted('BOARD_VIEW', $board);
+        } catch (AccessDeniedException) {
+            if (!$board->hasPublicAccess()) {
+                return $this->json(['error' => 'Forbidden.'], 403);
+            }
         }
         $public = $board->hasPublicAccess() && !$this->isGranted('BOARD_VIEW', $board);
+
         return $this->json(['elements' => array_map(fn (CanvasElement $element): array => $public ? $this->serializer->publicElement($element) : $this->serializer->element($element), $this->elements->findByBoard($board))]);
     }
 
@@ -52,15 +58,22 @@ final class CanvasApiController extends AbstractController
     public function create(string $boardId, Request $request): JsonResponse
     {
         $board = $this->boards->find($boardId);
-        if (!$board instanceof Board) return $this->json(['error' => 'Board not found.'], 404);
+        if (!$board instanceof Board) {
+            return $this->json(['error' => 'Board not found.'], 404);
+        }
         try {
             $this->denyAccessUnlessGranted('BOARD_EDIT', $board);
             $actor = $this->actor();
             $element = $this->boardService->addElement($board, $actor, $this->decodePayload($request));
             $this->timeline->record($board, $actor, sprintf('%s added a %s', $actor->getName(), $element->getType()), $element->getType());
-        } catch (\JsonException) { return $this->json(['error' => 'Malformed JSON payload.'], 400); }
-        catch (\InvalidArgumentException $exception) { return $this->json(['error' => $exception->getMessage()], 422); }
-        catch (AccessDeniedException) { return $this->json(['error' => 'Forbidden.'], 403); }
+        } catch (\JsonException) {
+            return $this->json(['error' => 'Malformed JSON payload.'], 400);
+        } catch (\InvalidArgumentException $exception) {
+            return $this->json(['error' => $exception->getMessage()], 422);
+        } catch (AccessDeniedException) {
+            return $this->json(['error' => 'Forbidden.'], 403);
+        }
+
         return $this->json($this->serializer->element($element), 201);
     }
 
@@ -68,13 +81,29 @@ final class CanvasApiController extends AbstractController
     public function update(string $id, Request $request): JsonResponse
     {
         $element = $this->elements->find($id);
-        if (!$element instanceof CanvasElement) return $this->json(['error' => 'Canvas element not found.'], 404);
+        if (!$element instanceof CanvasElement) {
+            return $this->json(['error' => 'Canvas element not found.'], 404);
+        }
         try {
             $board = $element->getBoard();
             $this->denyAccessUnlessGranted('BOARD_EDIT', $board);
             $actor = $this->actor();
             $payload = $this->decodePayload($request);
-            if (array_intersect(array_keys($payload), ['x', 'y', 'width', 'height', 'rotation']) !== []) {
+            foreach (['x', 'y', 'width', 'height', 'rotation'] as $numeric) {
+                if (!array_key_exists($numeric, $payload)) {
+                    continue;
+                }
+                if (!is_numeric($payload[$numeric]) || !is_finite((float) $payload[$numeric])) {
+                    throw new \InvalidArgumentException(sprintf('"%s" must be a finite number.', $numeric));
+                }
+            }
+            if (array_key_exists('content', $payload) && null !== $payload['content'] && !is_string($payload['content'])) {
+                throw new \InvalidArgumentException('Element content must be a string or null.');
+            }
+            if (array_key_exists('color', $payload) && null !== $payload['color'] && !is_string($payload['color'])) {
+                throw new \InvalidArgumentException('Element color must be a string or null.');
+            }
+            if ([] !== array_intersect(array_keys($payload), ['x', 'y', 'width', 'height', 'rotation'])) {
                 $element->updateGeometry(
                     array_key_exists('x', $payload) ? (float) $payload['x'] : $element->getX(),
                     array_key_exists('y', $payload) ? (float) $payload['y'] : $element->getY(),
@@ -83,17 +112,26 @@ final class CanvasApiController extends AbstractController
                     array_key_exists('rotation', $payload) ? (float) $payload['rotation'] : $element->getRotation(),
                 );
             }
-            if (array_key_exists('content', $payload)) $element->updateContent(null === $payload['content'] ? null : (string) $payload['content']);
+            if (array_key_exists('content', $payload)) {
+                $element->updateContent(null === $payload['content'] ? null : (string) $payload['content']);
+            }
             if (array_key_exists('color', $payload) || array_key_exists('metadata', $payload)) {
                 $metadata = array_key_exists('metadata', $payload) ? $payload['metadata'] : $element->getMetadata();
-                if (null !== $metadata && !is_array($metadata)) throw new \InvalidArgumentException('Element metadata must be an object.');
+                if (null !== $metadata && (!is_array($metadata) || array_is_list($metadata))) {
+                    throw new \InvalidArgumentException('Element metadata must be an object.');
+                }
                 $element->updateStyle(array_key_exists('color', $payload) && null !== $payload['color'] ? (string) $payload['color'] : $element->getColor(), $metadata);
             }
             $this->entityManager->flush();
             $this->timeline->record($board, $actor, sprintf('%s updated a %s', $actor->getName(), $element->getType()), $element->getType());
-        } catch (\JsonException) { return $this->json(['error' => 'Malformed JSON payload.'], 400); }
-        catch (\InvalidArgumentException $exception) { return $this->json(['error' => $exception->getMessage()], 422); }
-        catch (AccessDeniedException) { return $this->json(['error' => 'Forbidden.'], 403); }
+        } catch (\JsonException) {
+            return $this->json(['error' => 'Malformed JSON payload.'], 400);
+        } catch (\InvalidArgumentException $exception) {
+            return $this->json(['error' => $exception->getMessage()], 422);
+        } catch (AccessDeniedException) {
+            return $this->json(['error' => 'Forbidden.'], 403);
+        }
+
         return $this->json($this->serializer->element($element));
     }
 
@@ -101,10 +139,15 @@ final class CanvasApiController extends AbstractController
     public function delete(string $id): JsonResponse
     {
         $element = $this->elements->find($id);
-        if (!$element instanceof CanvasElement) return $this->json(['error' => 'Canvas element not found.'], 404);
+        if (!$element instanceof CanvasElement) {
+            return $this->json(['error' => 'Canvas element not found.'], 404);
+        }
         $board = $element->getBoard();
-        try { $this->denyAccessUnlessGranted('BOARD_EDIT', $board); }
-        catch (AccessDeniedException) { return $this->json(['error' => 'Forbidden.'], 403); }
+        try {
+            $this->denyAccessUnlessGranted('BOARD_EDIT', $board);
+        } catch (AccessDeniedException) {
+            return $this->json(['error' => 'Forbidden.'], 403);
+        }
         $actor = $this->actor();
         $type = $element->getType();
         $snapshot = array_map(
@@ -115,13 +158,17 @@ final class CanvasApiController extends AbstractController
         $board->touch();
         $this->entityManager->flush();
         $this->timeline->record($board, $actor, sprintf('%s deleted a %s', $actor->getName(), $type), $type, null, $snapshot);
+
         return new JsonResponse(null, Response::HTTP_NO_CONTENT);
     }
 
     private function actor(): User
     {
         $user = $this->getUser();
-        if (!$user instanceof User) throw new AccessDeniedException('Authentication required.');
+        if (!$user instanceof User) {
+            throw new AccessDeniedException('Authentication required.');
+        }
+
         return $user;
     }
 }

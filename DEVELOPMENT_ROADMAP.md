@@ -4,6 +4,28 @@ Mosaiq is a real-time collaborative whiteboard: a shared canvas of sticky notes,
 
 This roadmap covers only that product. Nothing here is claimed as production-ready. A phase is DONE only when the acceptance checks below have been run and recorded.
 
+## Audit addendum (2026-11-15)
+
+A full audit and repair pass is recorded in [`docs/technical-audit.md`](docs/technical-audit.md)
+and [`docs/repair-report.md`](docs/repair-report.md). It corrected the previously documented
+root commands and added the missing gates:
+
+| Check | Result |
+| --- | --- |
+| Root `pnpm run lint` / `build` / `test` | **PASS** — 7 files, 11 frontend tests |
+| `composer validate --no-check-publish` | **PASS** |
+| `composer audit --locked` | **PASS** — no advisories after Symfony 7.4.23 patch update |
+| `composer analyse` (PHPStan level 5, src + tests) | **PASS** — 0 errors |
+| `composer cs:check` | **PASS** — 0 of 57 files need fixing |
+| `composer test` | **PASS** — 33 tests, 194 assertions |
+| `doctrine:migrations:migrate` | **PASS** — `Version20261115090000` applied (workspace name index) |
+| `doctrine:schema:validate` | **PASS** |
+| `docker compose config --quiet` | **PASS** |
+| `.github/workflows/ci.yml` | **UPDATED, NOT RUN** — now includes Composer validation, audit, PHPStan and CS-Fixer |
+
+Phase 7 below is labelled DONE for the SSE transport only. The planned Node + Yjs/Hocuspocus
+service is **not implemented** and remains the recorded future architecture.
+
 ## Verified evidence (2026-11-14)
 
 | Check | Result |
@@ -67,7 +89,7 @@ Environment: Node 22.13.0, pnpm 12.14.0, TypeScript 5.9.3, PHP 8.5.12, Composer 
 | 4. Board editor interactions | **DONE** | Create, drag, edit and recolor sticky notes locally |
 | 5. API resources and client bridge | **DONE** | Symfony JSON API plus typed client with offline fallback |
 | 6. Authentication and board authorization | **DONE** | Hashed bearer tokens, account registration/login/logout, workspace/board voters and 401/403 functional coverage |
-| 7. Real-time collaboration service | **DONE** | SSE presence/canvas stream with reconnect, three-state connection badge and REST fallback; last-write-wins, no CRDT |
+| 7. Real-time collaboration service (SSE transport only) | **DONE (interim)** | SSE presence/canvas stream with reconnect, three-state connection badge and REST fallback; last-write-wins, no CRDT. The Node/Yjs service is **NOT IMPLEMENTED** |
 | 8. History, replay and restore | **DONE** | Canvas mutations record durable snapshots; replay reads snapshots and restore replaces board elements transactionally |
 | 9. Comments and sharing workflows | **DONE** | Server-backed threads, roles, hashed single-use invitations, Mailpit email delivery and a read-only `/board/:boardId` view (`/share` alias) |
 | 10. Quality and verification | **DONE** | Lint, zero-warning split build, Vitest including E2E, PHPUnit, container/schema checks and a GitHub Actions workflow |
@@ -200,9 +222,9 @@ php bin/console app:fixtures:load
 
 ---
 
-## Phase 7 — Real-time collaboration service
+## Phase 7 — Real-time collaboration service (SSE transport only)
 
-### Status: DONE (2026-11-14)
+### Status: DONE (2026-11-14) — interim transport, not the planned CRDT service
 
 - Authenticated `GET/POST /api/boards/{id}/presence` stores short-lived cursor/tool state and scopes it to board members.
 - `GET /api/boards/{id}/stream` is an authenticated Server-Sent Events endpoint. Each request emits `ready`, `presence` and `canvas` frames and closes; the browser reconnects every 500 ms, which keeps the requested 500 ms cadence without blocking the single-process PHP dev server.

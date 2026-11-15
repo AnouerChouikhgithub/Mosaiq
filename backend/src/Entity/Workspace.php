@@ -12,7 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: WorkspaceRepository::class)]
 #[ORM\Table(name: 'workspaces')]
-#[ORM\UniqueConstraint(name: 'uniq_workspaces_name', fields: ['name'])]
+#[ORM\Index(name: 'idx_workspaces_name', fields: ['name'])]
 class Workspace
 {
     public const PLANS = ['Starter', 'Pro', 'Enterprise'];

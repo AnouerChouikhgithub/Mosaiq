@@ -49,4 +49,22 @@ final class AuthApiControllerTest extends ApiFunctionalTestCase
         $created = $this->jsonResponse();
         self::assertNotSame($this->workspace->getId(), $created['workspace']['id']);
     }
+
+    public function testTwoAccountsWithTheSameDisplayNameGetSeparateWorkspaces(): void
+    {
+        $this->requestAs(null, 'POST', '/api/auth/register', [
+            'name' => 'Same Name', 'email' => 'same-name-one@example.test', 'password' => 'A-Long-Password-2026!',
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        $first = $this->jsonResponse();
+
+        $this->requestAs(null, 'POST', '/api/auth/register', [
+            'name' => 'Same Name', 'email' => 'same-name-two@example.test', 'password' => 'A-Long-Password-2026!',
+        ]);
+        self::assertResponseStatusCodeSame(201);
+        $second = $this->jsonResponse();
+
+        self::assertNotSame($first['workspace']['id'], $second['workspace']['id']);
+        self::assertNotSame($first['user']['id'], $second['user']['id']);
+    }
 }

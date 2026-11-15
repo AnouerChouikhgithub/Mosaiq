@@ -58,6 +58,7 @@ final class BoardInvitationMailer
                     ->html($html)
                     ->text($text),
             );
+
             return true;
         } catch (\Throwable $exception) {
             $this->logger->warning('Board invitation email could not be sent.', [
@@ -65,6 +66,7 @@ final class BoardInvitationMailer
                 'board' => $boardTitle,
                 'error' => $exception->getMessage(),
             ]);
+
             return false;
         }
     }

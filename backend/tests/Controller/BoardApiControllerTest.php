@@ -6,7 +6,6 @@ namespace App\Tests\Controller;
 
 use App\Entity\Board;
 use App\Entity\BoardInvitation;
-use App\Entity\Workspace;
 use Symfony\Bundle\FrameworkBundle\Test\MailerAssertionsTrait;
 
 final class BoardApiControllerTest extends ApiFunctionalTestCase
@@ -100,6 +99,22 @@ final class BoardApiControllerTest extends ApiFunctionalTestCase
 
         $this->requestAs(null, 'PATCH', '/api/boards/'.$this->board->getId(), ['title' => 'Tampered']);
         self::assertResponseStatusCodeSame(401);
+    }
+
+    public function testPublicBoardsAreNotListedForOtherWorkspaces(): void
+    {
+        $this->board->setPublicAccess(true);
+        $this->entityManager->flush();
+
+        // The direct link still works for the outsider...
+        $this->requestAs($this->outsiderToken, 'GET', '/api/boards/'.$this->board->getId());
+        self::assertResponseIsSuccessful();
+
+        // ...but it must not appear in their board list.
+        $this->requestAs($this->outsiderToken, 'GET', '/api/boards');
+        self::assertResponseIsSuccessful();
+        $ids = array_column($this->jsonResponse()['boards'], 'id');
+        self::assertNotContains($this->board->getId(), $ids);
     }
 
     public function testInvitationIsEmailBoundSingleUseAndGrantsOnlyBoardRole(): void

@@ -52,16 +52,16 @@ final class SyntheticFixtureLoaderTest extends TestCase
     {
         $loader = $this->loader('dev', 'postgresql://app:app@127.0.0.1:5432/mosaiq');
 
+        $this->expectNotToPerformAssertions();
         $loader->assertSafeTarget();
-        $this->addToAssertionCount(1);
     }
 
     public function testAcceptsTestDatabaseName(): void
     {
         $loader = $this->loader('test', 'postgresql://app:app@localhost:5432/mosaiq_test');
 
+        $this->expectNotToPerformAssertions();
         $loader->assertSafeTarget();
-        $this->addToAssertionCount(1);
     }
 
     private function loader(string $environment, string $databaseUrl): SyntheticFixtureLoader

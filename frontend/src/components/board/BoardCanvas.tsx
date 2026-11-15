@@ -8,6 +8,7 @@ import type {
   StickyNote,
 } from '@/mocks'
 import { users } from '@/mocks'
+import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import {
   accentClasses,
@@ -104,6 +105,7 @@ export function BoardCanvas({
   onMoveNote,
   onEditNote,
 }: BoardCanvasProps) {
+  const { t } = useI18n()
   const interactive = Boolean(onSelectNote)
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(
     null,
@@ -127,8 +129,8 @@ export function BoardCanvas({
       role={interactive ? 'group' : 'img'}
       aria-label={
         interactive
-          ? `Canevas du tableau : ${notes.length} notes`
-          : `Aperçu du tableau : ${notes.length} notes`
+          ? t('canvas.aria', { count: notes.length })
+          : t('canvas.previewAria', { count: notes.length })
       }
     >
       <div
@@ -253,7 +255,7 @@ export function BoardCanvas({
               aria-pressed={interactive && !editingNote ? selected : undefined}
               aria-label={
                 interactive && !editingNote
-                  ? `Sélectionner la note : ${note.text}`
+                  ? t('canvas.selectNote', { text: note.text })
                   : undefined
               }
               onClick={
@@ -365,7 +367,7 @@ export function BoardCanvas({
                 <textarea
                   autoFocus
                   value={editing.text}
-                  aria-label="Texte de la note"
+                  aria-label={t('canvas.noteText')}
                   onChange={(event) =>
                     setEditing({ id: note.id, text: event.target.value })
                   }

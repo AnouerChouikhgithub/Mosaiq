@@ -26,11 +26,14 @@ final class TimelineService
 
     public function record(Board $board, User $author, string $label, string $kind, ?array $reveals = null, ?array $snapshotOverride = null): TimelineEntry
     {
-        if (!in_array($kind, TimelineEntry::KINDS, true)) $kind = 'board';
+        if (!in_array($kind, TimelineEntry::KINDS, true)) {
+            $kind = 'board';
+        }
         $snapshot = $snapshotOverride ?? array_map(fn (CanvasElement $element): array => $this->serializer->element($element), $this->elements->findByBoard($board));
         $entry = new TimelineEntry($board, $author, new \DateTimeImmutable(), $label, $kind, $reveals, $snapshot);
         $this->entityManager->persist($entry);
         $this->entityManager->flush();
+
         return $entry;
     }
 
@@ -47,7 +50,9 @@ final class TimelineService
                 throw new \InvalidArgumentException('Stored timeline snapshot is invalid.');
             }
             $author = $this->users->find((string) $saved['author']['id']);
-            if (!$author instanceof User) throw new \InvalidArgumentException('Snapshot author no longer exists.');
+            if (!$author instanceof User) {
+                throw new \InvalidArgumentException('Snapshot author no longer exists.');
+            }
             $restored[] = new CanvasElement(
                 $board, $author, (string) $saved['type'], (float) $saved['x'], (float) $saved['y'],
                 (float) $saved['width'], (float) $saved['height'], (float) $saved['rotation'],
@@ -59,9 +64,13 @@ final class TimelineService
         }
 
         $this->entityManager->wrapInTransaction(function () use ($board, $actor, $restored, $entry): void {
-            foreach ($this->elements->findByBoard($board) as $element) $this->entityManager->remove($element);
+            foreach ($this->elements->findByBoard($board) as $element) {
+                $this->entityManager->remove($element);
+            }
             $this->entityManager->flush();
-            foreach ($restored as $element) $this->entityManager->persist($element);
+            foreach ($restored as $element) {
+                $this->entityManager->persist($element);
+            }
             $board->touch();
             $this->entityManager->flush();
             $this->record($board, $actor, sprintf('%s restored timeline step %s', $actor->getName(), $entry->getId()), 'board');

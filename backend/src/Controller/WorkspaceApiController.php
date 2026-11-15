@@ -24,7 +24,10 @@ final class WorkspaceApiController extends AbstractController
     public function index(): JsonResponse
     {
         $user = $this->getUser();
-        if (!$user instanceof User) return $this->json(['error' => 'Authentication required.'], 401);
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Authentication required.'], 401);
+        }
+
         return $this->json(['workspaces' => [$this->summary($user->getWorkspace())]]);
     }
 
@@ -32,9 +35,15 @@ final class WorkspaceApiController extends AbstractController
     public function show(string $id): JsonResponse
     {
         $workspace = $this->workspaces->find($id);
-        if (!$workspace instanceof Workspace) return $this->json(['error' => 'Workspace not found.'], 404);
-        try { $this->denyAccessUnlessGranted('WORKSPACE_VIEW', $workspace); }
-        catch (AccessDeniedException) { return $this->json(['error' => 'Forbidden.'], 403); }
+        if (!$workspace instanceof Workspace) {
+            return $this->json(['error' => 'Workspace not found.'], 404);
+        }
+        try {
+            $this->denyAccessUnlessGranted('WORKSPACE_VIEW', $workspace);
+        } catch (AccessDeniedException) {
+            return $this->json(['error' => 'Forbidden.'], 403);
+        }
+
         return $this->json($this->summary($workspace) + ['boards' => array_map(fn ($board): array => $this->serializer->summary($board), $workspace->getBoards()->toArray())]);
     }
 
