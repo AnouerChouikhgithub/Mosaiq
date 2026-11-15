@@ -9,6 +9,29 @@ This document records what the repository actually does, distinguished from what
 documentation claims. Nothing here is a claim that a repair has been made; repairs and
 their verification are recorded in [`repair-report.md`](repair-report.md).
 
+> **Sprint 0 update (2026-11-15).** The historical baseline below is kept as recorded at
+> `4f3689c`; the repository has since moved to `5b993fa` plus Sprint 0 changes. Two findings were
+> confirmed and fixed after this audit:
+>
+> - **CI backend failure (new, P0 for release confidence).** GitHub run `43715665395` failed at
+>   `composer install`: the lock was resolved on PHP 8.5 without a platform pin and selected
+>   `doctrine/collections 3.1.0` and `doctrine/instantiator 2.1.0`, both requiring PHP ^8.4,
+>   while CI runs PHP 8.3. `composer.json` now pins `config.platform.php=8.3.0`; the lock resolves
+>   `collections 2.6.0` / `instantiator 2.0.0`. CI also checks platform requirements, creates the
+>   `_test`-suffixed database, executes the migration sequence before schema validation, and the
+>   test harness now refuses to reset non-`_test` databases. See the Sprint 0 report.
+> - **Workspace board disclosure (P1).** `GET /api/workspaces/{id}` returned every board in the
+>   workspace after only a workspace-membership check, exposing private board ids, titles, member
+>   e-mails and element counts. It now filters through the same membership/administrator query as
+>   `/api/boards`, and `boardCount` counts only accessible boards. Seven regression tests cover
+>   the owner, workspace administrator, ordinary member, outsider, identifier swapping, nested
+>   leakage and direct-endpoint consistency.
+>
+> **Sprint 1 update (2026-11-15).** Authentication hardening is recorded in §8. Current gates:
+> PHPUnit **51 tests / 325 assertions**, PHPStan level 5 clean, PHP-CS-Fixer **0/60**, frontend
+> **8 files / 17 jsdom tests**, six migrations verified on fresh and test databases with schema in
+> sync. The GitHub workflow has not been re-run because no push was performed.
+
 Priority meaning:
 
 | Priority | Meaning |
@@ -70,7 +93,7 @@ docs/ui-spec.md               UI source of truth — still says "no backend call
 docker-compose.yml            Postgres 16, Redis 7, Mailpit (dev only)
 .github/workflows/ci.yml      frontend + backend jobs (no PHPStan / CS-Fixer gate)
 backend/                      Symfony 7.4 API, 10 Doctrine entities, 6 controllers, 9 repositories,
-                              6 services, 2 voters, 4 migrations, 27 tests
+                              6 services, 2 voters, 5 migrations, 34 tests
 frontend/                     React 19 + Vite 8 + TS 5.9 app, 8 screens, 17 UI primitives, 7 test files
 backend/compose.override.yaml  unreferenced Symfony Maker fragment (see I-03)
 .agents/skills/**             bundled third-party agent skills — NOT application code
@@ -124,10 +147,12 @@ not inferred from documentation.
   missing and whose `toId` points at the second endpoint. `BoardCanvas` resolves connectors by
   matching both ids against notes, so seeded connectors silently do not render. The database is
   seeded with wrong data that the idempotent loader will not repair on a second run.
-* **Correction:** map `fromKey → fromId`, `toKey → toId`; for local databases, re-seed the
-  affected connector rows (documented, non-destructive).
-* **Verification:** PHPStan level 5 no longer reports `strictComparison`; a fixture test asserts
-  the resolved `fromId`/`toId` pair.
+* **Correction:** map `fromKey → fromId`, `toKey → toId`; on reload, repair only a missing or
+  wrong `fromId`/`toId` on existing connector rows, preserving every other metadata key and never
+  rewriting note style metadata.
+* **Verification:** PHPStan level 5 no longer reports `strictComparison`; a fixture integration
+  test asserts the resolved pair, then corrupts one id, removes the other and checks that a
+  reload restores both while keeping unrelated metadata.
 
 #### B-03 — Canvas geometry silently coerces invalid input to `0.0` · **P2** · *confirmed by code path*
 
@@ -202,6 +227,8 @@ not inferred from documentation.
   support multiple sessions and revocation; add expiry. Architecture/dependency decision.
 * **Priority rationale:** P3 today because the product is single-session demo; it becomes P1
   before production.
+* **Sprint 1 update:** token expiry, login rotation and logout revocation are now implemented (see
+  §8). Multi-device sessions still require a token table and remain **PLANNED**.
 
 #### B-08 — Timeline writes flush once per record inside outer request flows · **P3** · *confirmed by code*
 
@@ -244,6 +271,9 @@ not inferred from documentation.
   (`symfony/uid` signed links + mailer), and a password policy. Rate limiting is the immediate
   mitigation; the rest is a product decision.
 * **Dependencies:** **blocked on approval** (§6).
+* **Sprint 1 update:** database-backed login/registration throttling and a shared password policy
+  are now implemented without a new dependency (see §8). Email verification, reset and breach-list
+  checks remain **BLOCKED / PLANNED**.
 
 #### B-11 — Bearer tokens are stored in `sessionStorage` · **P2** · *confirmed by client*
 
@@ -255,6 +285,8 @@ not inferred from documentation.
   front-end escaping discipline.
 * **Correction:** short-lived tokens + refresh, or an HttpOnly cookie with CSRF protection and a
   strict CSP. Architecture decision; documented, not changed in this pass.
+* **Sprint 1 update:** tokens now expire and authenticated 401s clear the browser session; the
+  storage model and missing CSP are unchanged (see §8).
 
 #### B-12 — Serializers expose author email on all authenticated board payloads · **P3** · *confirmed by code*
 
@@ -459,7 +491,7 @@ not inferred from documentation.
 | --- | --- | --- | --- | --- |
 | D-01 | P1 | `docs/ui-spec.md` | Says "No backend calls until the developer says so" and "typed mock data only"; the shipped app calls the API for boards, canvas, comments, presence, sharing and replay. An agent following the spec would try to remove working integration. | Add a status note that the mock-only phase was superseded by the implemented API bridge, keeping the visual requirements authoritative. |
 | D-02 | P1 | `README.md`, `DEVELOPMENT_ROADMAP.md` | Record `pnpm run lint`/`build` root checks as PASS, but those commands fail (F-01). Record "phases 0–10 DONE" including a "real-time collaboration service" while the same text admits no CRDT; the status table and the phase names disagree. | Correct the commands, and label the phase outcome (`SSE last-write-wins`, not CRDT). |
-| D-03 | P2 | `frontend/README.md` | File does not exist, although `README.md` and the brief expect it and it is the natural place for frontend-specific commands. | Restore a short, accurate frontend README. |
+| D-03 | P2 | `frontend/README.md` | File did not exist, although `README.md` and the brief expect it and it is the natural place for frontend-specific commands. | Restored in this pass with commands, structure, API configuration and limitations. |
 | D-04 | P2 | `AGENTS.md` | States all eight screens implemented (true) but also lists `pnpm run lint` root commands (broken), describes SSE as the sync architecture while the brief requires Node/Yjs/Hocuspocus, and does not mention PHPStan/PHP-CS-Fixer. | Align status, commands and the realtime decision record. |
 | D-05 | P3 | whole repo | No OpenAPI document, no `docs/architecture.md`, no ADR for the realtime choice, no `.env.example`. | Add architecture/ADR docs with the approved realtime design. |
 
@@ -484,7 +516,8 @@ not inferred from documentation.
 
 * **Problem:** the project ships `.php-cs-fixer.dist.php` but no composer script and no CI step;
   a dry run reports 20 of 55 files non-compliant (import order, trailing newlines, brace style).
-* **Correction:** add `cs:check`/`cs:fix` scripts, run the fixer once, add the dry-run gate to CI.
+* **Correction:** add `cs:check`/`cs:fix` scripts, run the fixer once, add the dry-run gate to CI,
+  and exclude `migrations/` because applied migrations are immutable and must not be reformatted.
 
 #### Q-03 — Test coverage is contract-shaped, not behaviour-complete · **P2** · *confirmed by test files*
 
@@ -591,7 +624,7 @@ has been installed. The work in this pass is limited to what existing dependenci
 | --- | --- | --- |
 | `api-platform/core` (4.x) + `api-platform/symfony` | Resource/operation metadata, OpenAPI generation, pagination, validation integration, Hydra/JSON-LD or JSON | Replaces hand-written controllers/serializers incrementally; State Providers/Processors only where behaviour is non-CRUD. **Requires an explicit architecture decision** because it changes the controller layer. |
 | `symfony/validator` + `symfony/serializer` | Declarative request validation and consistent (de)serialization | Works with or without API Platform; removes per-controller validation drift (B-03). |
-| `symfony/rate-limiter` | Throttle `/auth/login`, `/auth/register`, invitation creation | Direct mitigation for B-10; small, first-party. |
+| `symfony/rate-limiter` | Throttle `/auth/login`, `/auth/register`, invitation creation | Direct mitigation for B-10; small, first-party. **Superseded for login/registration by Sprint 1's DB-backed throttle; still not installed.** |
 | `phpstan/phpstan-doctrine` + `phpstan/phpstan-symfony` | Remove Doctrine-managed-property false positives and understand the container | Lets PHPStan run at level 6+ without hand-written ignores (Q-01). Extension installer optional. |
 | `lexik/jwt-authentication-bundle` + `web-token/jwt-library` + `symfony/uid` | The requested JWT auth, replacing the single opaque token | Only if JWT replaces bearer tokens; otherwise skip and keep hashed tokens. Requires key management (`config/jwt/*.pem`, already gitignored). |
 | `symfony/messenger` + `symfony/redis-messenger` (or `predis/predis`) | Async email/invitation delivery and future realtime events | Makes the existing Redis container purposeful. |
@@ -625,7 +658,7 @@ has been installed. The work in this pass is limited to what existing dependenci
 | Root scripts (F-01) | `pnpm run lint`, `pnpm run build`, `pnpm test` from the root |
 | PHP constraint (B-01) | `composer validate --no-check-publish`, `composer check-platform-reqs` |
 | PHPStan config + real fixes (Q-01, B-02) | `composer analyse` at level 5 |
-| PHP-CS-Fixer (Q-02) | `composer cs:check` exits 0 |
+| PHP-CS-Fixer (Q-02) | `composer cs:check` exits 0 on 53 files; `migrations/` excluded |
 | Geometry validation (B-03) | new PHPUnit cases: non-numeric create/update → 422, no row; valid path unchanged |
 | Workspace name uniqueness (B-04) | new PHPUnit case: two registrations, same name → 201, distinct workspaces; schema validate |
 | Public board listing (B-09) | new PHPUnit case: outsider's board list excludes another workspace's public board |
@@ -638,3 +671,129 @@ has been installed. The work in this pass is limited to what existing dependenci
 Checks that **cannot** be run in this pass: anything requiring the §6 packages (RateLimiter,
 Validator, API Platform, Playwright, Doctrine PHPStan extension), a GitHub-hosted CI run, and
 two-client realtime verification.
+
+---
+
+## 8. Sprint 1 addendum — authentication and security hardening (2026-11-15)
+
+This section supersedes the auth-related dispositions in §3.1 and the security summary in §3.3.
+It does **not** claim production readiness. The full evidence and limitations are in
+[`docs/sprints/sprint-1-report.md`](sprints/sprint-1-report.md).
+
+### 8.1 What changed
+
+| Area | Before | After |
+| --- | --- | --- |
+| Token lifetime | No expiry; stolen token valid indefinitely | `AUTH_TOKEN_TTL` (default 7 days); authenticator rejects expired/revoked tokens |
+| Token rotation | New login overwrote the hash | Same single-session model, now explicit and tested; logout revokes |
+| Password hashing | Direct `password_hash` / `password_verify` | Symfony configured `UserPasswordHasherInterface` |
+| Password policy | `strlen >= 12` | 12–72 bytes, at least one letter and one digit, shared backend service and signup UI check |
+| Login throttle | None | 5 failures / 15 min per email+IP and 20 / 15 min per IP (test: 3) |
+| Registration throttle | None | 10 / hour per IP (test: 5) |
+| Throttle response | — | `429` + `Retry-After`; success clears login failures |
+| Auth response headers | Defaults | `nosniff`, `no-referrer`, `DENY`, `Cache-Control: no-store` on `/api/auth` |
+| Browser 401 | Stayed in the signed-in shell | Clear `sessionStorage`, redirect to `/sign-in?expired=1`, translated notice |
+| Logout offline | Error propagated after local clear | Local clear is guaranteed; the server token still expires |
+
+The throttle is a small Doctrine entity/repository (`AuthAttempt`, `auth_attempts`), not
+`symfony/rate-limiter` or Redis. Keys are SHA-256(email + IP) and SHA-256(IP); only hashes are
+stored. Rows are pruned on write. This avoids a dependency and works across PHP processes sharing
+the database, but it is not a distributed limiter and adds a write per attempt.
+
+### 8.2 Current security summary
+
+| Control | Status |
+| --- | --- |
+| Token storage at rest | **Good** — random 48-byte value, SHA-256 hash only |
+| Token lifetime | **Good** — expiry enforced in the authenticator; default 7 days |
+| Token revocation | **Good for the single session** — logout and login rotation |
+| Password storage | **Good** — Symfony hasher (bcrypt cost 4 in test, configured default elsewhere) |
+| Password policy | **Moderate** — length + letter/digit; no breach list or history |
+| Brute-force resistance | **Moderate** — per-key/IP DB throttle; no distributed limiter; proxy caveat |
+| Account verification | **Missing** — no email ownership proof |
+| Password recovery | **Missing** — demo link only |
+| Browser token exposure | **Weak** — `sessionStorage`, no CSP |
+| Response caching | **Good for auth** — `no-store`; other API routes rely on defaults |
+| CORS | **Development only** — loopback Vite allowlist; no production policy |
+| Authorization | **Strong** — server-side board/workspace voters; Sprint 0 filtered summaries |
+
+### 8.3 Explicitly not implemented / blocked
+
+- Email verification: no verified-email field, token, route, template or mail flow. Needs an
+  approved product rule and a token design.
+- Password reset and password change: no routes; the UI "forgot" action is not a reset flow.
+  Any future sensitive account mutation must re-authenticate the current password.
+- Multi-device sessions: still one active token per user.
+- CSP, HttpOnly-cookie sessions and CSRF protection: unchanged.
+- Breach-list password checks, password history and account lockout beyond the sliding throttle.
+- Distributed/Redis throttling and trusted-proxy configuration.
+- Real-browser verification of the expired-session redirect; a GitHub Actions re-run.
+
+### 8.4 Verification (2026-11-15)
+
+| Check | Result |
+| --- | --- |
+| Backend PHPUnit | **PASS** — 51 tests / 325 assertions (10 new security tests / 62 assertions) |
+| PHPStan level 5 | **PASS** — 0 errors |
+| PHP-CS-Fixer | **PASS** — 0 of 60 files |
+| `composer validate` / `composer audit --locked` | **PASS** / no advisories |
+| `lint:container` + dev `schema:validate` | **PASS** |
+| Sprint 1 migration | **PASS** — applied additively to dev (4 boards preserved); fresh DB up/down/up; test DB migrated and validated |
+| PHP 8.3 syntax | **PASS** — `src`, `tests`, `migrations` parsed by `php:8.3-cli` |
+| Frontend lint/build | **PASS** — ESLint, `tsc -b`, Vite 2,207 modules |
+| Frontend Vitest | **PASS** — 8 files / 17 tests (6 new session/validation tests) |
+| GitHub Actions / real-browser expiry flow | **NOT VERIFIED / NOT RUN** |
+
+### 8.5 Operational notes
+
+- Existing tokens have a null expiry after the migration and are rejected. Users must sign in once.
+- Production must set `APP_ENV=prod`, `APP_DEBUG=0`, a strong `APP_SECRET`, `AUTH_TOKEN_TTL` and the
+  `AUTH_*` limits; behind a reverse proxy set `SYMFONY_TRUSTED_PROXIES` or per-IP limits are ineffective.
+- The development CORS allowlist is loopback-only. Production should serve the SPA and API from the
+  same origin or configure an explicit policy; no wildcard credential CORS was added.
+
+## 9. Sprint 2 addendum — workspace administration (2026-11-15)
+
+Sprint 2 extended the existing single-workspace membership embedded in `User` instead of adding a
+redundant membership table. `membership_status` and `membership_updated_at` are additive; active
+membership is checked by the authenticator and both voters. Removal revokes the token and removes
+all board memberships in one transaction.
+
+The permission matrix is centralized in `WorkspaceMembershipPolicy`: one Owner; Owner can manage
+Admins and Members; Admin can manage Member roles and invite Member roles; no self role change,
+no Owner role grant/removal, no owner/self removal. Workspace invitations are 32-byte tokens stored
+as SHA-256, email-bound, seven-day and revocable; acceptance is transactional during registration
+for new accounts only. `workspace_invitations` and the membership columns were added by
+`Version20261115180000`.
+
+**Verified:** 69 tests / 437 assertions at Sprint 2 completion, 9 frontend files / 24 tests,
+PHPStan and CS-Fixer clean, schema validation pass. The full report and deferred decisions (owner
+transfer, self-leave, removed-account re-invitation, resend/decline, durable audit, multi-workspace)
+are in [`sprints/sprint-2-report.md`](sprints/sprint-2-report.md).
+
+## 10. Sprint 3 addendum — board lifecycle (2026-11-15)
+
+Boards now use one `lifecycle_status` (`active`/`archived`/`trashed`) plus nullable
+`archived_at`/`trashed_at`; the inactive timestamp is cleared on every transition. Active and
+archive/trash listings require the exact status. `BOARD_MANAGE` is separate from content access:
+board Owner/Admin or workspace administrator can archive/trash/restore; archived boards are
+view-only; trashed content and anonymous public reads are denied. The pre-existing workspace-admin
+board bypass remains explicit.
+
+**Permanent deletion is PLANNED.** No approved retention period, deletion authorization or
+dependent-record policy exists. Trashed boards are retained indefinitely; no automatic purge or
+delete endpoint was added. Lifecycle actions use the application logger; a durable audit table is
+PLANNED. Concurrent transitions are server-side checked but not row-locked.
+
+`Version20261115190000` adds the lifecycle columns and `(workspace_id, lifecycle_status)` index.
+Verified on the preserved dev database and on a fresh disposable database (eight migrations,
+latest down/up, schema validation). Final gates: 75 backend tests / 532 assertions; 10 frontend
+files / 28 tests; PHPStan clean; CS-Fixer 0/65; lint and production build pass. Full evidence is in
+[`sprints/sprint-3-report.md`](sprints/sprint-3-report.md).
+
+### 10.1 Remaining lifecycle risks
+
+- No permanent-delete/retention workflow; do not infer a 30-day policy from old UI copy.
+- No durable audit or row locking for administrative actions.
+- Workspace Admin access to unjoined private boards remains a broad, explicitly documented policy.
+- No real-browser pass of archive/trash; no green GitHub Actions run (no push).

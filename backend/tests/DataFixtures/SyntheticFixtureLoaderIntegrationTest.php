@@ -38,4 +38,38 @@ final class SyntheticFixtureLoaderIntegrationTest extends ApiFunctionalTestCase
         $second = $loader->load();
         self::assertSame(0, array_sum($second));
     }
+
+    public function testReloadRepairsOnlyConnectorIdsAndPreservesOtherMetadata(): void
+    {
+        /** @var SyntheticFixtureLoader $loader */
+        $loader = self::getContainer()->get(SyntheticFixtureLoader::class);
+        $loader->load();
+
+        $this->entityManager->clear();
+        /** @var CanvasElementRepository $elements */
+        $elements = $this->entityManager->getRepository(CanvasElement::class);
+        $connector = $elements->findOneBy(['type' => 'connector']);
+        self::assertInstanceOf(CanvasElement::class, $connector);
+        $connectorId = $connector->getId();
+        $expected = $connector->getMetadata();
+        self::assertIsArray($expected);
+
+        // Simulate a stale row: one wrong id, one missing id and unrelated metadata.
+        $connector->updateStyle($connector->getColor(), [
+            'fromId' => 'stale-id',
+            'custom' => 'keep-me',
+        ]);
+        $this->entityManager->flush();
+
+        self::assertSame(0, array_sum($loader->load()));
+
+        $this->entityManager->clear();
+        $repaired = $elements->find($connectorId);
+        self::assertInstanceOf(CanvasElement::class, $repaired);
+        $metadata = $repaired->getMetadata();
+        self::assertIsArray($metadata);
+        self::assertSame($expected['fromId'], $metadata['fromId']);
+        self::assertSame($expected['toId'], $metadata['toId']);
+        self::assertSame('keep-me', $metadata['custom']);
+    }
 }

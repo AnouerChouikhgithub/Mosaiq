@@ -45,7 +45,8 @@ const api = vi.hoisted(() => {
     login: vi.fn(async () => {
       window.sessionStorage.setItem('mosaiq-api-token', 'e2e-session-token')
       window.sessionStorage.setItem('mosaiq-api-user', JSON.stringify(user))
-      return { token: 'e2e-session-token', user, workspace: { id: 'w1', name: 'Studio Carthage', plan: 'Pro' } }
+      window.sessionStorage.setItem('mosaiq-api-workspace', JSON.stringify({ id: 'w1', name: 'Studio Carthage', plan: 'Pro', memberCount: 8 }))
+      return { token: 'e2e-session-token', user, workspace: { id: 'w1', name: 'Studio Carthage', plan: 'Pro', memberCount: 8 } }
     }),
     logout: vi.fn(async () => { window.sessionStorage.clear() }),
     getBoards: vi.fn(async () => [board]),
@@ -77,11 +78,28 @@ vi.mock('@/api/client', () => ({
     const value = window.sessionStorage.getItem('mosaiq-api-user')
     return value ? JSON.parse(value) : null
   },
+  getSessionWorkspace: () => {
+    const value = window.sessionStorage.getItem('mosaiq-api-workspace')
+    return value ? JSON.parse(value) : null
+  },
+  WORKSPACE_UPDATED_EVENT: 'mosaiq:workspace-updated',
+  rememberSessionWorkspace: vi.fn(),
+  getWorkspaces: vi.fn(async () => []),
+  updateWorkspace: vi.fn(),
+  getWorkspaceMembers: vi.fn(async () => []),
+  updateWorkspaceMember: vi.fn(),
+  removeWorkspaceMember: vi.fn(),
+  getWorkspaceInvitations: vi.fn(async () => []),
+  inviteWorkspaceMember: vi.fn(),
+  revokeWorkspaceInvitation: vi.fn(),
   login: api.login,
   register: vi.fn(),
   acceptBoardInvitation: vi.fn(),
   logout: api.logout,
   getBoards: api.getBoards,
+  archiveBoard: vi.fn(),
+  trashBoard: vi.fn(),
+  restoreBoardLifecycle: vi.fn(),
   getBoard: api.getBoard,
   getPublicBoard: vi.fn(),
   createBoard: vi.fn(),

@@ -18,7 +18,8 @@ use Doctrine\ORM\EntityManagerInterface;
 /**
  * Loads the synthetic catalog once, then re-running it upserts by natural keys
  * (workspace name, user email, board title, element coordinates, label) and
- * never deletes existing rows.
+ * never deletes existing rows. Existing elements keep their metadata except
+ * for missing or wrong connector ids, which are repaired in place.
  */
 final class SyntheticFixtureLoader
 {
@@ -127,17 +128,22 @@ final class SyntheticFixtureLoader
 
             $metadata = $definition['metadata'] ?? null;
             if (is_array($metadata)) {
-                $resolved = [];
+                $relations = [];
                 foreach (['fromKey', 'toKey'] as $relation) {
                     if (isset($metadata[$relation])) {
                         $referenced = $elements[(string) $metadata[$relation]] ?? null;
                         if (!$referenced instanceof CanvasElement) {
                             throw new \RuntimeException(sprintf('Unknown connector target "%s".', (string) $metadata[$relation]));
                         }
-                        $resolved['fromKey' === $relation ? 'fromId' : 'toId'] = $referenced->getId();
+                        $relations['fromKey' === $relation ? 'fromId' : 'toId'] = $referenced->getId();
                     }
                 }
-                $metadata = $resolved;
+                // Keep authored metadata (note style, future keys); only the
+                // unresolved relation keys become persisted element ids.
+                $metadata = array_merge(
+                    array_diff_key($metadata, ['fromKey' => true, 'toKey' => true]),
+                    $relations,
+                );
             }
 
             if (!$element instanceof CanvasElement) {
@@ -157,10 +163,24 @@ final class SyntheticFixtureLoader
                 );
                 $this->entityManager->persist($element);
                 ++$stats['elements'];
-            } elseif (is_array($metadata) && $element->getMetadata() !== $metadata) {
-                // Repair rows seeded before the connector mapping fix without
-                // deleting anything: a reload rewrites only divergent metadata.
-                $element->updateStyle($element->getColor(), $metadata);
+            } elseif (is_array($metadata)) {
+                $current = $element->getMetadata() ?? [];
+                $repaired = $current;
+                $changed = false;
+                foreach (['fromId', 'toId'] as $key) {
+                    if (!array_key_exists($key, $metadata)) {
+                        continue;
+                    }
+                    if (($repaired[$key] ?? null) !== $metadata[$key]) {
+                        $repaired[$key] = $metadata[$key];
+                        $changed = true;
+                    }
+                }
+                if ($changed) {
+                    // A reload repairs only missing or wrong connector ids; it
+                    // never replaces other metadata stored on the element.
+                    $element->updateStyle($element->getColor(), $repaired);
+                }
             }
 
             $elements[(string) $definition['key']] = $element;

@@ -14,9 +14,14 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'boards')]
 #[ORM\Index(name: 'idx_boards_workspace', fields: ['workspace'])]
 #[ORM\Index(name: 'idx_boards_updated', fields: ['updatedAt'])]
+#[ORM\Index(name: 'idx_boards_workspace_lifecycle', fields: ['workspace', 'lifecycleStatus'])]
 class Board
 {
     public const NOTE_COLORS = ['amber', 'rose', 'sky', 'mint', 'lilac'];
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_ARCHIVED = 'archived';
+    public const STATUS_TRASHED = 'trashed';
+    public const LIFECYCLE_STATUSES = [self::STATUS_ACTIVE, self::STATUS_ARCHIVED, self::STATUS_TRASHED];
 
     #[ORM\Id]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
@@ -65,6 +70,15 @@ class Board
 
     #[ORM\Column(name: 'updated_at', type: 'datetimetz_immutable')]
     private \DateTimeImmutable $updatedAt;
+
+    #[ORM\Column(name: 'lifecycle_status', length: 16, options: ['default' => self::STATUS_ACTIVE])]
+    private string $lifecycleStatus = self::STATUS_ACTIVE;
+
+    #[ORM\Column(name: 'archived_at', type: 'datetimetz_immutable', nullable: true)]
+    private ?\DateTimeImmutable $archivedAt = null;
+
+    #[ORM\Column(name: 'trashed_at', type: 'datetimetz_immutable', nullable: true)]
+    private ?\DateTimeImmutable $trashedAt = null;
 
     /** @param list<string> $noteColors */
     public function __construct(Workspace $workspace, string $title, array $noteColors = ['amber', 'sky', 'mint'], bool $isTemplate = false, ?\DateTimeImmutable $now = null)
@@ -117,6 +131,71 @@ class Board
     public function isTemplate(): bool
     {
         return $this->isTemplate;
+    }
+
+    public function getLifecycleStatus(): string
+    {
+        return $this->lifecycleStatus;
+    }
+
+    public function isActive(): bool
+    {
+        return self::STATUS_ACTIVE === $this->lifecycleStatus;
+    }
+
+    public function isArchived(): bool
+    {
+        return self::STATUS_ARCHIVED === $this->lifecycleStatus;
+    }
+
+    public function isTrashed(): bool
+    {
+        return self::STATUS_TRASHED === $this->lifecycleStatus;
+    }
+
+    public function getArchivedAt(): ?\DateTimeImmutable
+    {
+        return $this->archivedAt;
+    }
+
+    public function getTrashedAt(): ?\DateTimeImmutable
+    {
+        return $this->trashedAt;
+    }
+
+    public function archive(?\DateTimeImmutable $now = null): void
+    {
+        if (!$this->isActive()) {
+            throw new \InvalidArgumentException('Only an active board can be archived.');
+        }
+        $this->lifecycleStatus = self::STATUS_ARCHIVED;
+        $this->archivedAt = $now ?? new \DateTimeImmutable();
+        $this->trashedAt = null;
+        $this->touch($now);
+    }
+
+    public function trash(?\DateTimeImmutable $now = null): void
+    {
+        if ($this->isTrashed()) {
+            throw new \InvalidArgumentException('The board is already in the trash.');
+        }
+        // An archived board may be discarded deliberately; it never keeps both
+        // archive and trash timestamps once it enters the trash.
+        $this->lifecycleStatus = self::STATUS_TRASHED;
+        $this->trashedAt = $now ?? new \DateTimeImmutable();
+        $this->archivedAt = null;
+        $this->touch($now);
+    }
+
+    public function restoreLifecycle(?\DateTimeImmutable $now = null): void
+    {
+        if ($this->isActive()) {
+            return;
+        }
+        $this->lifecycleStatus = self::STATUS_ACTIVE;
+        $this->archivedAt = null;
+        $this->trashedAt = null;
+        $this->touch($now);
     }
 
     /** @return list<string> */

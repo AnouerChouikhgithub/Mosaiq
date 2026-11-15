@@ -31,18 +31,18 @@ class BoardRepository extends ServiceEntityRepository
     }
 
     /** @return list<Board> */
-    public function findAccessibleTo(User $user): array
+    public function findAccessibleTo(User $user, string $status = Board::STATUS_ACTIVE): array
     {
-        return $this->queryAccessible($user)
+        return $this->queryAccessible($user, $status)
             ->orderBy('board.updatedAt', 'DESC')
             ->getQuery()
             ->getResult();
     }
 
     /** @return list<Board> */
-    public function findAccessibleInWorkspace(User $user, Workspace $workspace): array
+    public function findAccessibleInWorkspace(User $user, Workspace $workspace, string $status = Board::STATUS_ACTIVE): array
     {
-        return $this->queryAccessible($user)
+        return $this->queryAccessible($user, $status)
             ->andWhere('board.workspace = :requestedWorkspace')
             ->setParameter('requestedWorkspace', $workspace)
             ->orderBy('board.updatedAt', 'DESC')
@@ -56,13 +56,17 @@ class BoardRepository extends ServiceEntityRepository
      * other workspaces stay reachable through their direct link only: they must
      * not turn the dashboard into a cross-workspace directory.
      */
-    private function queryAccessible(User $user): \Doctrine\ORM\QueryBuilder
+    private function queryAccessible(User $user, string $status): \Doctrine\ORM\QueryBuilder
     {
         return $this->createQueryBuilder('board')
             ->andWhere('EXISTS (SELECT membership.role FROM App\\Entity\\BoardMembership membership WHERE membership.board = board AND membership.user = :user) OR (board.workspace = :workspace AND :isAdmin = true)')
+            ->andWhere(':activeMember = true')
+            ->andWhere('board.lifecycleStatus = :lifecycleStatus')
             ->setParameter('user', $user)
             ->setParameter('workspace', $user->getWorkspace())
-            ->setParameter('isAdmin', $user->canAdministerWorkspace());
+            ->setParameter('isAdmin', $user->canAdministerWorkspace())
+            ->setParameter('activeMember', $user->hasActiveWorkspaceMembership())
+            ->setParameter('lifecycleStatus', $status);
     }
 
     public function findOneByWorkspaceAndTitle(Workspace $workspace, string $title): ?Board

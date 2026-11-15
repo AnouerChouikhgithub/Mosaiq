@@ -20,15 +20,23 @@ const API_BASE_URL = (
 const REQUEST_TIMEOUT_MS = 5_000
 const SESSION_TOKEN_KEY = 'mosaiq-api-token'
 const SESSION_USER_KEY = 'mosaiq-api-user'
+const SESSION_WORKSPACE_KEY = 'mosaiq-api-workspace'
 
 export interface ApiSessionUser extends ApiUser {
   boardRole?: string
 }
 
+export interface ApiSessionWorkspace {
+  id: string
+  name: string
+  plan: string
+  memberCount?: number
+}
+
 export interface ApiSession {
   token: string
   user: ApiSessionUser
-  workspace: { id: string; name: string; plan: string }
+  workspace: ApiSessionWorkspace
 }
 
 export interface ApiTimelineEntry {
@@ -103,11 +111,40 @@ export function getSessionUser(): ApiSessionUser | null {
 function saveSession(session: ApiSession): void {
   window.sessionStorage.setItem(SESSION_TOKEN_KEY, session.token)
   window.sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(session.user))
+  window.sessionStorage.setItem(SESSION_WORKSPACE_KEY, JSON.stringify(session.workspace))
+}
+
+export function getSessionWorkspace(): ApiSessionWorkspace | null {
+  const value = window.sessionStorage.getItem(SESSION_WORKSPACE_KEY)
+  if (!value) return null
+  try {
+    return JSON.parse(value) as ApiSessionWorkspace
+  } catch {
+    window.sessionStorage.removeItem(SESSION_WORKSPACE_KEY)
+    return null
+  }
 }
 
 export function clearSession(): void {
   window.sessionStorage.removeItem(SESSION_TOKEN_KEY)
   window.sessionStorage.removeItem(SESSION_USER_KEY)
+  window.sessionStorage.removeItem(SESSION_WORKSPACE_KEY)
+}
+
+export const SESSION_EXPIRED_EVENT = 'mosaiq:session-expired'
+export const WORKSPACE_UPDATED_EVENT = 'mosaiq:workspace-updated'
+
+/** Keeps the shell in sync after settings/member changes without a reload. */
+export function rememberSessionWorkspace(workspace: ApiSessionWorkspace): void {
+  window.sessionStorage.setItem(SESSION_WORKSPACE_KEY, JSON.stringify(workspace))
+  window.dispatchEvent(new CustomEvent<ApiSessionWorkspace>(WORKSPACE_UPDATED_EVENT, { detail: workspace }))
+}
+
+function expireSession(): void {
+  // Guard against a burst of parallel 401s dispatching several redirects.
+  if (!getSessionToken()) return
+  clearSession()
+  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
 }
 
 export interface ApiWorkspace {
@@ -123,20 +160,44 @@ export interface ApiWorkspace {
   createdAt: string
 }
 
+export interface ApiWorkspaceMember extends ApiUser {
+  status: 'active' | 'removed'
+  joinedAt: string
+  updatedAt: string
+}
+
+export interface ApiWorkspaceInvitation {
+  id: string
+  email: string
+  role: 'Admin' | 'Editor' | 'Commenter' | 'Viewer'
+  status: 'pending' | 'accepted' | 'revoked' | 'expired'
+  createdAt: string
+  expiresAt: string
+  acceptedAt: string | null
+  revokedAt: string | null
+  invitedBy: { id: string; name: string }
+}
+
 export interface ApiUser {
   id: string
   name: string
   email: string
   role: User['role']
+  status?: 'active' | 'removed'
   city: string
   accent: User['accent']
 }
+
+export type ApiBoardStatus = 'active' | 'archived' | 'trashed'
 
 export interface ApiBoard {
   id: string
   title: string
   starred: boolean
   isTemplate: boolean
+  status?: ApiBoardStatus
+  archivedAt?: string | null
+  trashedAt?: string | null
   publicAccess?: boolean
   members: (ApiUser & { boardRole?: string })[]
   noteColors: string[]
@@ -221,6 +282,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       }
       const error = new Error(message) as Error & { status?: number }
       error.status = response.status
+
+      // A login/registration 401 is a credential error, not an expired session.
+      if (
+        response.status === 401 &&
+        token &&
+        path !== '/auth/login' &&
+        path !== '/auth/register'
+      ) {
+        expireSession()
+      }
+
       throw error
     }
 
@@ -248,10 +320,22 @@ export async function login(email: string, password: string): Promise<ApiSession
   return session
 }
 
-export async function register(name: string, email: string, password: string, invitationToken?: string): Promise<ApiSession> {
+export async function register(
+  name: string,
+  email: string,
+  password: string,
+  invitationToken?: string,
+  workspaceInvitationToken?: string,
+): Promise<ApiSession> {
   const session = await request<ApiSession>('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ name, email, password, ...(invitationToken ? { invitationToken } : {}) }),
+    body: JSON.stringify({
+      name,
+      email,
+      password,
+      ...(invitationToken ? { invitationToken } : {}),
+      ...(workspaceInvitationToken ? { workspaceInvitationToken } : {}),
+    }),
   })
   saveSession(session)
   return session
@@ -264,6 +348,9 @@ export async function getMe(): Promise<{ user: ApiSessionUser; workspace: { id: 
 export async function logout(): Promise<void> {
   try {
     if (getSessionToken()) await request('/auth/logout', { method: 'POST' })
+  } catch {
+    // A failed network call must not trap the user in the signed-in UI. The
+    // server-side token still expires at AUTH_TOKEN_TTL if revocation failed.
   } finally {
     clearSession()
   }
@@ -274,12 +361,80 @@ export async function getWorkspaces(): Promise<ApiWorkspace[]> {
   return data.workspaces
 }
 
-export async function getBoards(workspaceId?: string): Promise<ApiBoard[]> {
-  const query = workspaceId
-    ? `?workspaceId=${encodeURIComponent(workspaceId)}`
-    : ''
+export async function updateWorkspace(id: string, name: string): Promise<ApiWorkspace> {
+  return request<ApiWorkspace>(`/workspaces/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function getWorkspaceMembers(id: string): Promise<ApiWorkspaceMember[]> {
+  const data = await request<{ members: ApiWorkspaceMember[] }>(`/workspaces/${encodeURIComponent(id)}/members`)
+  return data.members
+}
+
+export async function updateWorkspaceMember(
+  workspaceId: string,
+  userId: string,
+  role: string,
+): Promise<ApiWorkspaceMember> {
+  const data = await request<{ member: ApiWorkspaceMember }>(
+    `/workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(userId)}`,
+    { method: 'PATCH', body: JSON.stringify({ role }) },
+  )
+  return data.member
+}
+
+export async function removeWorkspaceMember(workspaceId: string, userId: string): Promise<void> {
+  await request(`/workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function getWorkspaceInvitations(id: string): Promise<ApiWorkspaceInvitation[]> {
+  const data = await request<{ invitations: ApiWorkspaceInvitation[] }>(
+    `/workspaces/${encodeURIComponent(id)}/invitations`,
+  )
+  return data.invitations
+}
+
+export async function inviteWorkspaceMember(
+  workspaceId: string,
+  email: string,
+  role: string,
+): Promise<{ invitation: ApiWorkspaceInvitation; token: string; emailSent: boolean }> {
+  return request(`/workspaces/${encodeURIComponent(workspaceId)}/invitations`, {
+    method: 'POST',
+    body: JSON.stringify({ email, role }),
+  })
+}
+
+export async function revokeWorkspaceInvitation(workspaceId: string, invitationId: string): Promise<void> {
+  await request(
+    `/workspaces/${encodeURIComponent(workspaceId)}/invitations/${encodeURIComponent(invitationId)}`,
+    { method: 'DELETE' },
+  )
+}
+
+export async function getBoards(workspaceId?: string, status?: ApiBoardStatus): Promise<ApiBoard[]> {
+  const params = new URLSearchParams()
+  if (workspaceId) params.set('workspaceId', workspaceId)
+  if (status) params.set('status', status)
+  const query = params.size > 0 ? `?${params.toString()}` : ''
   const data = await request<{ boards: ApiBoard[] }>(`/boards${query}`)
   return data.boards
+}
+
+export async function archiveBoard(id: string): Promise<ApiBoard> {
+  return request<ApiBoard>(`/boards/${encodeURIComponent(id)}/archive`, { method: 'POST' })
+}
+
+export async function trashBoard(id: string): Promise<ApiBoard> {
+  return request<ApiBoard>(`/boards/${encodeURIComponent(id)}/trash`, { method: 'POST' })
+}
+
+export async function restoreBoardLifecycle(id: string): Promise<ApiBoard> {
+  return request<ApiBoard>(`/boards/${encodeURIComponent(id)}/restore`, { method: 'POST' })
 }
 
 export async function createBoard(
@@ -550,6 +705,17 @@ function metadataValue<T extends string>(
 
 /** Maps the API summary onto the typed board model used by the screens. */
 export function toBoard(api: ApiBoard, locale: Locale): Board {
+  const currentUser = getSessionUser()
+  const membership = api.members.find((member) => member.id === currentUser?.id)
+  const canManage = Boolean(
+    currentUser && (
+      currentUser.role === 'Owner' ||
+      currentUser.role === 'Admin' ||
+      membership?.boardRole === 'Owner' ||
+      membership?.boardRole === 'Admin'
+    ),
+  )
+
   return {
     id: api.id,
     title: api.title,
@@ -559,6 +725,7 @@ export function toBoard(api: ApiBoard, locale: Locale): Board {
     memberIds: api.members.map(localUserId),
     noteColors: api.noteColors.filter(isNoteColor),
     isTemplate: api.isTemplate,
+    canManage,
   }
 }
 

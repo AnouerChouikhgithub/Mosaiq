@@ -17,6 +17,7 @@ use App\Service\BoardSerializer;
 use App\Service\BoardService;
 use App\Service\TimelineService;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -38,6 +39,7 @@ final class BoardApiController extends AbstractController
         private readonly BoardSerializer $serializer,
         private readonly TimelineService $timeline,
         private readonly EntityManagerInterface $entityManager,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -45,6 +47,10 @@ final class BoardApiController extends AbstractController
     public function index(Request $request): JsonResponse
     {
         $user = $this->requireUser();
+        $status = $request->query->get('status', Board::STATUS_ACTIVE);
+        if (!in_array($status, Board::LIFECYCLE_STATUSES, true)) {
+            return $this->json(['error' => 'Board status is not supported.'], 422);
+        }
         $workspaceId = $request->query->get('workspaceId');
         if (null !== $workspaceId && '' !== $workspaceId) {
             $workspace = $this->workspaces->find($workspaceId);
@@ -59,9 +65,9 @@ final class BoardApiController extends AbstractController
             } catch (AccessDeniedException) {
                 return $this->json(['error' => 'Forbidden.'], 403);
             }
-            $boards = $this->boards->findAccessibleInWorkspace($user, $workspace);
+            $boards = $this->boards->findAccessibleInWorkspace($user, $workspace, $status);
         } else {
-            $boards = $this->boards->findAccessibleTo($user);
+            $boards = $this->boards->findAccessibleTo($user, $status);
         }
 
         return $this->json(['boards' => array_map(fn (Board $board): array => $this->serializer->summary($board), $boards)]);
@@ -109,7 +115,7 @@ final class BoardApiController extends AbstractController
         try {
             $this->denyAccessUnlessGranted('BOARD_VIEW', $board);
         } catch (AccessDeniedException) {
-            if (!$board->hasPublicAccess()) {
+            if (!$board->hasPublicAccess() || !$board->isActive()) {
                 return $this->json(['error' => 'Forbidden.'], 403);
             }
 
@@ -117,6 +123,78 @@ final class BoardApiController extends AbstractController
         }
 
         return $this->json($this->serializer->detail($board));
+    }
+
+    #[Route('/{id}/archive', name: 'archive', methods: ['POST'])]
+    public function archive(string $id): JsonResponse
+    {
+        $board = $this->boards->find($id);
+        if (!$board instanceof Board) {
+            return $this->json(['error' => 'Board not found.'], 404);
+        }
+        try {
+            $this->denyAccessUnlessGranted('BOARD_MANAGE', $board);
+            if (!$board->isActive()) {
+                return $this->json(['error' => 'Only an active board can be archived.'], 409);
+            }
+            $board->archive();
+            $this->entityManager->flush();
+            $this->logLifecycle($board, 'board.archived');
+        } catch (AccessDeniedException) {
+            return $this->json(['error' => 'Forbidden.'], 403);
+        } catch (\InvalidArgumentException $exception) {
+            return $this->json(['error' => $exception->getMessage()], 409);
+        }
+
+        return $this->json($this->serializer->summary($board));
+    }
+
+    #[Route('/{id}/trash', name: 'trash', methods: ['POST'])]
+    public function trash(string $id): JsonResponse
+    {
+        $board = $this->boards->find($id);
+        if (!$board instanceof Board) {
+            return $this->json(['error' => 'Board not found.'], 404);
+        }
+        try {
+            $this->denyAccessUnlessGranted('BOARD_MANAGE', $board);
+            if ($board->isTrashed()) {
+                return $this->json(['error' => 'The board is already in the trash.'], 409);
+            }
+            $board->trash();
+            $this->entityManager->flush();
+            $this->logLifecycle($board, 'board.trashed');
+        } catch (AccessDeniedException) {
+            return $this->json(['error' => 'Forbidden.'], 403);
+        } catch (\InvalidArgumentException $exception) {
+            return $this->json(['error' => $exception->getMessage()], 409);
+        }
+
+        return $this->json($this->serializer->summary($board));
+    }
+
+    #[Route('/{id}/restore', name: 'restore_lifecycle', methods: ['POST'])]
+    public function restoreLifecycle(string $id): JsonResponse
+    {
+        $board = $this->boards->find($id);
+        if (!$board instanceof Board) {
+            return $this->json(['error' => 'Board not found.'], 404);
+        }
+        try {
+            $this->denyAccessUnlessGranted('BOARD_MANAGE', $board);
+            if ($board->isActive()) {
+                return $this->json($this->serializer->summary($board));
+            }
+            $board->restoreLifecycle();
+            $this->entityManager->flush();
+            $this->logLifecycle($board, 'board.restored');
+        } catch (AccessDeniedException) {
+            return $this->json(['error' => 'Forbidden.'], 403);
+        } catch (\InvalidArgumentException $exception) {
+            return $this->json(['error' => $exception->getMessage()], 409);
+        }
+
+        return $this->json($this->serializer->summary($board));
     }
 
     #[Route('/{id}', name: 'update', methods: ['PATCH'])]
@@ -175,7 +253,7 @@ final class BoardApiController extends AbstractController
         try {
             $this->denyAccessUnlessGranted('BOARD_VIEW', $board);
         } catch (AccessDeniedException) {
-            if (!$board->hasPublicAccess()) {
+            if (!$board->hasPublicAccess() || !$board->isActive()) {
                 return $this->json(['error' => 'Forbidden.'], 403);
             }
 
@@ -351,6 +429,9 @@ final class BoardApiController extends AbstractController
             return $this->json(['error' => 'Invitation is invalid, expired or already accepted.'], 404);
         }
         $board = $invitation->getBoard();
+        if (!$board->isActive()) {
+            return $this->json(['error' => 'This board is no longer accepting invitations.'], 422);
+        }
         if (!$invitation->matchesEmail($actor->getEmail())) {
             return $this->json(['error' => 'Invitation belongs to another email address.'], 403);
         }
@@ -392,6 +473,17 @@ final class BoardApiController extends AbstractController
         }
 
         return $this->json($this->serializer->summary($board));
+    }
+
+    private function logLifecycle(Board $board, string $action): void
+    {
+        $actor = $this->getUser();
+        $this->logger->info($action, [
+            'board' => $board->getId(),
+            'workspace' => $board->getWorkspace()->getId(),
+            'actor' => $actor instanceof User ? $actor->getId() : null,
+            'status' => $board->getLifecycleStatus(),
+        ]);
     }
 
     private function requireUser(): User

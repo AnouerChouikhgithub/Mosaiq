@@ -37,7 +37,16 @@ abstract class ApiFunctionalTestCase extends WebTestCase
         $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
         $metadata = $this->entityManager->getMetadataFactory()->getAllMetadata();
         $schema = new SchemaTool($this->entityManager);
-        $schema->dropSchema($metadata);
+
+        // Tests own a disposable database (the test env appends "_test"). Refuse
+        // to reset anything else, then drop every table rather than only mapped
+        // ones: migration-created foreign keys make SchemaTool::dropSchema()
+        // silently skip tables, which breaks a run after `migrations:migrate`.
+        $database = (string) $this->entityManager->getConnection()->fetchOne('SELECT current_database()');
+        if (!str_contains($database, '_test')) {
+            throw new \RuntimeException(sprintf('Refusing to reset non-test database "%s".', $database));
+        }
+        $schema->dropDatabase();
         $schema->createSchema($metadata);
 
         $this->workspace = new Workspace('API Test Workspace', 'Pro', 50, 10, new \DateTimeImmutable('+30 days'));
@@ -66,7 +75,7 @@ abstract class ApiFunctionalTestCase extends WebTestCase
         static $accent = 0;
         $user = new User($workspace, $email, ucfirst(strstr($email, '@', true) ?: $email), $role, 'Tunis', User::ACCENTS[$accent++ % count(User::ACCENTS)]);
         $user->setPasswordHash(password_hash('Correct-Horse-2026!', PASSWORD_DEFAULT));
-        $user->setApiTokenHash(hash('sha256', $token));
+        $user->issueApiToken(hash('sha256', $token), new \DateTimeImmutable('+1 day'));
         $this->entityManager->persist($user);
         $this->entityManager->flush();
 

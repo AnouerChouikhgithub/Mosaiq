@@ -33,7 +33,7 @@ final class WorkspaceVoter extends Voter
         /** @var Workspace $workspace */
         $workspace = $subject;
 
-        if ($user->getWorkspace()->getId() !== $workspace->getId()) {
+        if (!$user->hasActiveWorkspaceMembership() || $user->getWorkspace()->getId() !== $workspace->getId()) {
             return false;
         }
 

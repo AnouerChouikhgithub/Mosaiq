@@ -2,9 +2,36 @@
 
 **Date:** 2026-11-15
 **Branch / HEAD:** `main` at `4f3689c`, tracking `origin/main`
-**Working tree:** intentionally uncommitted; no commit, push, reset or discard was performed.
-`NEXT-AGENT-PROMPT.md` was left untouched. The persistent Compose database volume was not reset.
+**Repository state:** the changes were left uncommitted by this agent; no commit, push, reset or
+discard was performed. `NEXT-AGENT-PROMPT.md` was left untouched and the persistent Compose
+database volume was not reset. (The repository owner later committed this pass as `5b993fa`.)
 **Change scope:** 41 tracked files modified, 7 created, 0 removed; no new package was installed.
+
+> **Sprint 0 addendum (2026-11-15).** This report describes the earlier repair pass, now committed
+> as `5b993fa`. Sprint 0 confirmed two further issues and fixed them:
+>
+> - The GitHub workflow **did run** after that commit (`43715665395`): the frontend passed, the
+>   backend failed at `composer install` because the lock required PHP 8.4 while CI runs 8.3. The
+>   lock is now resolved against the declared floor (`config.platform.php=8.3.0`), and the workflow
+>   additionally checks platform requirements and the migration sequence. The workflow has not been
+>   re-run on GitHub.
+> - `GET /api/workspaces/{id}` disclosed every board summary in the workspace to any workspace
+>   member. It now reuses the accessible-board query (membership or workspace administrator) and
+>   counts only accessible boards; seven regression tests cover the authorization cases.
+>
+> Current counts supersede §9: **41 tests / 263 assertions**, PHP-CS-Fixer **0/54**, frontend
+> **7 files / 11 tests**. Fresh-database verification: 5 migrations / 55 statements, schema in sync.
+> No push or commit was performed in Sprint 0.
+>
+> **Sprint 1 addendum (2026-11-15).** Sprint 1 hardened authentication and supersedes the auth debt
+> below: tokens now expire (`AUTH_TOKEN_TTL`, default 7 days), rotate on login and are revoked on
+> logout; registration/login use Symfony's hasher and a 12–72 character policy; login/registration
+> are throttled through `auth_attempts` with `429`/`Retry-After`; and an authenticated browser 401
+> clears the session and redirects to `/sign-in?expired=1`. Current counts: **51 tests / 325
+> assertions**, PHP-CS-Fixer **0/60**, frontend **8 files / 17 tests**, **6 migrations**. Email
+> verification, password reset/change, multi-device sessions, CSP/HttpOnly cookies, breach-list
+> checks and distributed throttling remain unimplemented; see
+> [`docs/sprints/sprint-1-report.md`](sprints/sprint-1-report.md).
 
 ---
 
@@ -30,7 +57,7 @@ problems:
    an explicit decision, and the current SSE transport must not be described as CRDT.
 
 All defects that could be fixed with installed dependencies were fixed and verified. The backend
-suite grew from 27 to 33 tests; the frontend from 10 to 11. Ten Symfony security advisories were
+suite grew from 27 to 34 tests; the frontend from 10 to 11. Ten Symfony security advisories were
 cleared by a patch-level update. Everything else is recorded below with its blocker.
 
 ---
@@ -47,11 +74,11 @@ Full evidence is in [`technical-audit.md`](technical-audit.md). Summary:
 | B-04 | P2 | Duplicate workspace name returns 500 on registration | **Fixed** |
 | B-05 | P2 | No Validator/Serializer/OpenAPI/pagination | Blocked by approval |
 | B-06 | P2 | Ad-hoc error format, no central exception mapping | Deferred |
-| B-07 | P3 | One opaque token per user, no expiry/rotation | Deferred |
+| B-07 | P3 | One opaque token per user, no expiry/rotation | **Partially fixed in Sprint 1** — expiry/rotation/revocation; multi-device still deferred |
 | B-08 | P3 | One flush per timeline record; large snapshots | Deferred |
 | B-09 | P2 | Public boards listed across workspaces | **Fixed** |
-| B-10 | P1 | No auth rate limiting, email verification or password policy | Blocked by approval |
-| B-11 | P2 | Bearer token in `sessionStorage`, no CSP | Deferred (architecture) |
+| B-10 | P1 | No auth rate limiting, email verification or password policy | **Partially fixed in Sprint 1** — throttling + policy; email verification blocked |
+| B-11 | P2 | Bearer token in `sessionStorage`, no CSP | **Partially mitigated in Sprint 1** — expiry + 401 handling; storage/CSP still deferred |
 | B-12 | P3 | Board payloads expose member emails | Deferred |
 | F-01 | P1 | Root npm wrapper scripts broken | **Fixed** |
 | F-02 | P1 | Board title edits never persisted | **Fixed** |
@@ -68,7 +95,7 @@ Full evidence is in [`technical-audit.md`](technical-audit.md). Summary:
 | I-04 | P2 | CI did not run PHPStan, CS-Fixer, validate or audit | **Fixed in workflow** (not run on GitHub) |
 | D-01…D-05 | P1–P3 | Documentation contradicted the implementation | **Mostly fixed**; OpenAPI/architecture docs remain |
 | Q-01 | P2 | PHPStan unconfigured (17 errors at level 5) | **Fixed** (level 5, 0 errors) |
-| Q-02 | P2 | PHP-CS-Fixer failed and was ungated | **Fixed** (0/58, gated) |
+| Q-02 | P2 | PHP-CS-Fixer failed and was ungated | **Fixed** (0/53, gated; migrations excluded) |
 | Q-03 | P2 | Tests do not cover every screen/edge path | Partially improved |
 
 ---
@@ -101,11 +128,12 @@ compiles/tests pass, but the full user flow was not exercised in a browser.
 * **Problem:** the key selector compared `'fromId' === $relation` inside a loop over
   `['fromKey', 'toKey']`, which is always false. Both endpoints were written to `toId`, so seeded
   connectors had no `fromId` and did not render.
-* **Change:** map `fromKey → fromId` and `toKey → toId`. Resolution now happens before the
-  create/exists branch, and an existing element with divergent metadata is repaired in place via
-  `updateStyle()`, so already-seeded databases heal on the next fixture load without deletion.
-* **Verified:** new integration test (21 assertions) plus a real reload of the local dev database;
-  all 3 connector rows now contain distinct `fromId`/`toId`.
+* **Change:** map `fromKey → fromId` and `toKey → toId`, preserving non-relation metadata when
+  resolving. On reload, only a missing or wrong `fromId`/`toId` is written back to an existing
+  element; every other metadata key (note style, custom or future keys) is left untouched.
+* **Verified:** integration test creates the fixtures, corrupts one id, removes the other, reloads
+  and asserts both are restored while an unrelated `custom` key survives. A real reload of the
+  local dev database leaves all 3 connector rows with distinct, resolvable endpoints.
 
 ### 3.4 Canvas geometry validation — FIXED
 
@@ -156,11 +184,14 @@ compiles/tests pass, but the full user flow was not exercised in a browser.
 
 ### 3.8 PHP-CS-Fixer — FIXED
 
-* **Files:** `backend/composer.json`, 20 reformatted files
+* **Files:** `backend/composer.json`, `backend/.php-cs-fixer.dist.php`, 20 reformatted files
 * **Change:** added `cs:check` / `cs:fix` scripts and ran the project's own fixer. Changes are
   formatting only (import order, trailing newlines, brace/line layout). No logic was altered;
-  the full suite passes afterwards.
-* **Verified:** `composer cs:check` → 0 of 58 files fixable.
+  the full suite passes afterwards. `migrations/` is now excluded because applied migrations are
+  immutable, and the formatter no longer touches them; the earlier formatting change to
+  `Version20261114120000.php` was reverted to its exact pre-format content from `4f3689c`
+  (including the missing trailing newline).
+* **Verified:** `composer cs:check` → 0 of 53 files fixable (5 migrations excluded).
 
 ### 3.9 Editor title persistence — FIXED
 
@@ -224,7 +255,7 @@ compiles/tests pass, but the full user flow was not exercised in a browser.
   polyfills). No major or minor version changed; `symfony/flex` was bumped to `^2.12` by
   Composer's `bump-after-update` setting.
 * **Verified:** `composer audit --locked` → **"No security vulnerability advisories found."**;
-  PHPStan, CS-Fixer and all 33 tests pass afterwards.
+  PHPStan, CS-Fixer and all 34 tests pass afterwards.
 
 ---
 
@@ -245,11 +276,11 @@ installed in this pass; only existing Symfony components were patched for securi
 
 ### 4.2 Deferred intentionally
 
-* **Dashboard trash (F-03).** Implementing it requires a product decision between hard delete and
-  soft delete with retention. Adding a destructive endpoint silently would be worse than the
-  current demo control. The UI remains local-only and is now documented as such.
-* **Workspace settings roles (F-04).** Needs workspace membership endpoints plus server
-  authorization and tests; the screen still shows mock data and local role changes.
+* **Permanent board deletion / retention (F-03 follow-up).** Sprint 3 implemented persisted archive,
+  trash and restore. Permanent deletion still requires an approved retention and dependent-record
+  policy; no destructive endpoint or purge job was added. The trash remains recoverable indefinitely.
+* **Workspace settings roles (F-04).** Resolved in Sprint 2: member listing, role changes, removal,
+  invitations and settings use the backend with server-side authorization and tests.
 * **Shape/text/pen/image tools (F-05).** A feature build, not a repair. Only select, note and
   comment are wired; connectors and frames render from data.
 * **Realtime CRDT (B/A-09).** The brief and `AGENTS.md` describe different strategies. The SSE
@@ -342,7 +373,8 @@ expiry/rotation, CSP, and reducing member email exposure. They are blocked or de
   * new canvas validation cases (invalid `x`, invalid `width`, list metadata, non-string type);
   * duplicate display-name registration;
   * public board not listed for another workspace;
-  * fixture integration (connector endpoints distinct and resolvable; second load creates 0 rows).
+  * fixture integration (connector endpoints distinct and resolvable; second load creates 0 rows;
+    a corrupted/missing connector id is repaired while unrelated metadata is preserved).
 * **Frontend:** root lint, production build and Vitest after the client/editor/i18n changes;
   new test for board-title persistence.
 * **Static analysis:** PHPStan level 5 over `src` and `tests`; PHP-CS-Fixer dry run over 58 files.
@@ -353,9 +385,11 @@ expiry/rotation, CSP, and reducing member email exposure. They are blocked or de
 * **Documentation:** every command in the README check table was executed in this pass, except the
   GitHub Actions run, which cannot be executed from this machine.
 
-Not performed: real-browser click-through of the new comment dialog or title save, two-client
-collaboration, invite-link signup, Playwright/axe, Lighthouse, PHP 8.3 runtime test (local runtime
-is PHP 8.5.12; CI targets 8.3), and the GitHub-hosted CI run.
+Not performed in that pass: real-browser click-through of the new comment dialog or title save,
+two-client collaboration, invite-link signup, Playwright/axe, Lighthouse, a PHP 8.3 runtime test
+(local runtime is PHP 8.5.12; CI targets 8.3) and the GitHub-hosted CI run. Sprint 0 later parsed
+all backend files with PHP 8.3.36 and observed the GitHub run, which failed at `composer install`
+as recorded in the addendum.
 
 ---
 
@@ -370,8 +404,8 @@ is PHP 8.5.12; CI targets 8.3), and the GitHub-hosted CI run.
 | `composer check-platform-reqs` | **PASS** — no missing platform requirement on PHP 8.5.12 |
 | `composer audit --locked` | **PASS** — no advisories |
 | `composer analyse` (PHPStan 2.3.1, level 5) | **PASS** — `[OK] No errors` |
-| `composer cs:check` (PHP-CS-Fixer 3.95.27) | **PASS** — 0 of 58 files fixable |
-| `composer test` / `php bin/phpunit` | **PASS** — **33 tests, 194 assertions**, ~68–82 s |
+| `composer cs:check` (PHP-CS-Fixer 3.95.27) | **PASS** — 0 of 53 files fixable (`migrations/` excluded) |
+| `composer test` / `php bin/phpunit` | **PASS** — **34 tests, 202 assertions**, ~68–82 s |
 | `php bin/console lint:container` | **PASS** |
 | `php bin/console doctrine:schema:validate` | **PASS** — mapping correct, database in sync |
 | `doctrine:migrations:migrate --no-interaction` | **PASS** — `Version20261115090000`, 1 migration, 2 SQL queries |
@@ -379,7 +413,7 @@ is PHP 8.5.12; CI targets 8.3), and the GitHub-hosted CI run.
 | `php bin/console app:fixtures:load` | **PASS** — 0 created on reload (idempotent) |
 | `docker compose config --quiet` | **PASS** |
 | `docker compose ps` | `mosaiq-db` healthy, `mosaiq-mailpit` healthy, `mosaiq-redis` running |
-| GitHub Actions | **NOT RUN** — workflow updated only |
+| GitHub Actions | **FAILED (later run)** — `43715665395` failed at `composer install`; Sprint 0 fixed the PHP 8.3 lock, re-run pending |
 
 ---
 
@@ -408,7 +442,7 @@ composer and title-save logic; vendor/UI chunks are unchanged.
 | `backend/phpstan.neon.dist` | PHPStan level 5 configuration over `src` + `tests`, with two documented, path-scoped Doctrine ignores |
 | `backend/migrations/Version20261115090000.php` | Replace the unique workspace-name constraint with a lookup index |
 | `backend/tests/Controller/CanvasApiControllerTest.php` | Geometry/payload validation cases |
-| `backend/tests/DataFixtures/SyntheticFixtureLoaderIntegrationTest.php` | Connector endpoint resolution + idempotent reload |
+| `backend/tests/DataFixtures/SyntheticFixtureLoaderIntegrationTest.php` | Connector endpoint resolution, idempotent reload, targeted repair with metadata preservation |
 | `frontend/README.md` | Frontend commands, structure, API configuration and limitations |
 
 ---
@@ -427,7 +461,8 @@ Functional changes (formatting-only files from the CS-Fixer run are listed separ
 | `backend/src/Controller/CommentApiController.php` | Removed unused `UserRepository` dependency |
 | `backend/src/Service/BoardService.php` | Element input validation (type, geometry, metadata object) |
 | `backend/src/Repository/BoardRepository.php` | Accessible-board scoping no longer includes all public boards |
-| `backend/src/DataFixtures/SyntheticFixtureLoader.php` | `fromKey`/`toKey` mapping fix + in-place metadata repair |
+| `backend/.php-cs-fixer.dist.php` | Exclude immutable `migrations/` from formatting |
+| `backend/src/DataFixtures/SyntheticFixtureLoader.php` | `fromKey`/`toKey` mapping fix; reload repairs only missing/wrong connector ids and preserves other metadata |
 | `backend/src/Entity/Workspace.php` | Unique constraint → non-unique index |
 | `backend/src/Security/ApiTokenAuthenticator.php` | Narrowed return types surfaced by PHPStan |
 | `backend/tests/bootstrap.php` | Removed redundant `method_exists` guard |
@@ -452,8 +487,9 @@ Formatting-only (PHP-CS-Fixer), no logic change:
 `BoardApiController.php`, `PresenceApiController.php`, `WorkspaceApiController.php`,
 `BoardVoter.php`, `BoardInvitationMailer.php`, `TimelineService.php`, `Entity/Board.php`,
 `Entity/BoardInvitation.php`, `Entity/BoardPresence.php`, `Repository/BoardPresenceRepository.php`,
-`migrations/Version20261114120000.php`, `tests/Controller/ApiFunctionalTestCase.php`,
-`tests/Controller/PresenceApiControllerTest.php`.
+`tests/Controller/ApiFunctionalTestCase.php`, `tests/Controller/PresenceApiControllerTest.php`.
+`migrations/Version20261114120000.php` was reformatted by the fixer and then restored to its
+`4f3689c` content; the only remaining difference is the fixer-added trailing newline being removed.
 
 ---
 
@@ -470,17 +506,20 @@ recommended action.
 ## 14. Remaining technical debt
 
 **Security / correctness**
-1. No login/registration rate limiting, email verification or robust password policy (P1 before
-   production).
-2. Single opaque token per user, no expiry/rotation; token in `sessionStorage`; no CSP.
+1. Email verification, password reset/change, breach-list checks and distributed rate limiting are
+   still missing (Sprint 1 added DB-backed throttling and a password policy).
+2. Tokens still use `sessionStorage` with no CSP and a single active session; expiry/rotation/
+   revocation were added in Sprint 1.
 3. Board payloads include member emails; split user summary/self serializers.
 4. Ad-hoc error shape; no central exception listener (some uncaught failures can escape).
 5. `backend/compose.override.yaml` is dead configuration; Redis has no application role yet.
 
-**Product gaps presented as implemented**
-6. Dashboard trash and workspace role controls are local-only demo paths; the UI exposes them.
+**Product gaps / remaining scope**
+6. Workspace roles and dashboard archive/trash are persisted; permanent board deletion and trash
+   retention are **PLANNED** because no policy is approved.
 7. Five canvas tools are inert; shapes/text are not part of the element model.
-8. No board deletion, undo/redo, multi-select, or offline queue.
+8. No permanent board deletion, undo/redo, multi-select, or offline queue. Durable audit logging is
+   **PLANNED**; administrative actions currently use application logs.
 
 **Architecture / scale**
 9. Hand-written wire types vs three PHP serializers — no OpenAPI source of truth.
@@ -503,8 +542,9 @@ recommended action.
 2. **Resolve the realtime strategy explicitly** — keep SSE as the documented interim transport, or
    commission the Node + Yjs/Hocuspocus service from the audit's integration table. One transport,
    not two. Test with two clients before claiming collaboration.
-3. **Finish the auth hardening** first among security work: rate limiting, email verification,
-   token expiry/multi-device, and a CSP. These are prerequisites for any public deployment.
+3. **Finish the auth hardening**: email verification, password reset/change, multi-device sessions,
+   CSP/HttpOnly cookies and distributed throttling. Sprint 1 delivered expiry/rotation, throttling
+   and the expired-session UI; the rest remain prerequisites for public deployment.
 4. **Make the demo controls honest**: implement soft-delete + trash retention, workspace member
    endpoints, or disable those controls with an explicit "demo" affordance.
 5. **Introduce a contract source**: API Platform resources + OpenAPI, then generate or validate the
@@ -526,7 +566,8 @@ recommended action.
   Symfony advisories; Compose/CI configuration (local config verified, GitHub run pending).
 * **Implemented but not fully verified:** comment composer dialog; localised canvas labels in a
   real browser; Redis healthcheck on a recreated container; title-save visual flow.
-* **Blocked by dependency approval:** API Platform/OpenAPI, JWT, Messenger/Redis, rate limiting,
-  email verification, Playwright/axe, Doctrine/Symfony PHPStan extensions.
+* **Blocked by dependency approval:** API Platform/OpenAPI, JWT, Messenger/Redis, Redis rate
+  limiting, email verification, Playwright/axe, Doctrine/Symfony PHPStan extensions.
 * **Deferred intentionally:** CRDT realtime, dashboard trash, workspace role persistence,
-  shape/text/pen/image tools, token model/CSP/email minimisation, pagination, error boundary.
+  shape/text/pen/image tools, email verification/reset, multi-device sessions, CSP/cookie model,
+  pagination, error boundary.

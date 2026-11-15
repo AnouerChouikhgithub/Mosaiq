@@ -5,9 +5,9 @@ Real-time collaborative whiteboard: shared canvas with sticky notes, shapes, liv
 ## Status
 
 - Frontend: design foundation plus all eight `docs/ui-spec.md` screens are implemented (light and dark) with FR/EN/AR localization. The dashboard and board editor load data through `frontend/src/api/client.ts` and fall back to typed mock data from `frontend/src/mocks/` when the API is unreachable.
-- Backend: Symfony 7.4 with Doctrine entities, repositories, hashed bearer-token authentication, board/workspace voters, JSON API controllers, durable snapshots, comments, sharing controls, presence, migrations, fixtures and functional tests.
+- Backend: Symfony 7.4 with Doctrine entities, repositories, expiring hashed bearer-token authentication, Symfony password hashing with a shared policy, database-backed credential throttling, board/workspace voters, JSON API controllers, durable snapshots, comments, sharing controls, workspace membership/invitations, persisted board active/archived/trashed lifecycle, presence, migrations, fixtures and functional tests. Permanent board deletion and trash retention are **PLANNED**.
 - Sync: `GET /api/boards/{id}/stream` sends authenticated SSE presence/canvas frames; the client reconnects every 500 ms, shows **En direct / Synchronisation… / Mode hors ligne**, and keeps a 3 s REST poll fallback (cursor writes are throttled to 250 ms). This is last-write-wins, not Yjs/Hocuspocus CRDT or conflict-free merge.
-- Quality gates (verified 2026-11-15): root `pnpm run lint`, `pnpm run build` (0 chunk warnings) and `pnpm test` (7 files, 11 tests); backend PHPUnit (33 tests, 194 assertions), PHPStan level 5 (`composer analyse`), PHP-CS-Fixer (`composer cs:check`), `composer validate`, `composer audit` (no advisories), container and schema checks pass. `.github/workflows/ci.yml` runs all of these but has not been executed on GitHub; the browser check used one client.
+- Quality gates (verified 2026-11-15, Sprint 3): root `pnpm run lint`, `pnpm run build` and `pnpm test` (10 files, 28 tests); backend PHPUnit (75 tests, 532 assertions), PHPStan level 5 (`composer analyse`), PHP-CS-Fixer (`composer cs:check`, 0/65), `composer validate`, `composer audit` (no advisories), container checks, fresh/test-database migrations and schema validation pass, and all PHP parses under 8.3. `.github/workflows/ci.yml` gates these checks plus `composer check-platform-reqs` and the migration sequence, but its only GitHub run (`43715665395`) failed at `composer install` before Sprint 0 fixed the PHP 8.3 lock; a re-run is still pending. Archive/trash/settings flows are covered by jsdom tests, not a real-browser pass.
 
 ## Brand
 
@@ -31,8 +31,9 @@ Main color: `#6D4AFF` (light) / `#8B73FF` (dark). Use it sparingly as the single
 
 ## Backend stack
 
-- Installed: PHP >= 8.3 (the locked PHPUnit 12 floor, also used by CI), Symfony 7.4, Doctrine ORM 3 / DBAL 4, DoctrineBundle, DoctrineMigrationsBundle, SecurityBundle, `symfony/mailer`.
+- Installed: PHP >= 8.3 (the locked PHPUnit 12 floor, also used by CI); `composer.json` pins `config.platform.php` to `8.3.0` so the lock always resolves for that floor. Symfony 7.4, Doctrine ORM 3 / DBAL 4, DoctrineBundle, DoctrineMigrationsBundle, SecurityBundle, `symfony/mailer`, and Symfony's password hasher via SecurityBundle.
 - Not installed: API Platform, LexikJWT, Symfony Messenger, Symfony Validator and constraints, `symfony/rate-limiter`, Doctrine/Symfony PHPStan extensions. The consolidated proposal and the decisions they depend on are in `docs/technical-audit.md` §6; do not install them piecemeal.
+- Auth limits and token lifetime are environment-driven (`AUTH_TOKEN_TTL`, `AUTH_THROTTLE_ENABLED`, `AUTH_LOGIN_*`, `AUTH_REGISTER_*`). `.env` holds documented defaults; `.env.test` uses lower limits. The throttle stores SHA-256 keyed rows in `auth_attempts`, not Redis.
 
 ## UI conventions
 
@@ -64,7 +65,8 @@ Main color: `#6D4AFF` (light) / `#8B73FF` (dark). Use it sparingly as the single
 - Prefer simple, readable code over clever code. Explain non-obvious decisions in short comments.
 - Ask before adding a new dependency or changing the architecture.
 - Treat Yjs/Hocuspocus CRDT sync, API Platform/OpenAPI, a remote CI run and two-client browser verification as incomplete. Email invitations are delivered through Mailpit; do not describe SSE last-write-wins as conflict-free CRDT sync or local fallback UI as a persisted server feature.
-- Read `docs/technical-audit.md` before changing auth, canvas validation, workspace uniqueness, the realtime transport or the dependency set, and `docs/repair-report.md` for what is still deferred. Demo-only controls (dashboard trash, workspace member roles, five canvas tools) must not be described as persisted features.
+- Email verification, password reset/change, multi-device sessions, CSP and HttpOnly-cookie sessions are **not implemented**. Do not describe the `409` registration response as enumeration-safe, the DB throttle as distributed, or `sessionStorage` as XSS-proof. Read the Sprint 1 report before changing auth.
+- Read `docs/technical-audit.md` before changing auth, canvas validation, workspace uniqueness, board lifecycle, the realtime transport or the dependency set, and `docs/repair-report.md` for what is still deferred. Workspace member roles, invitations and board archive/trash are persisted; the five canvas tools remain partly demo-only, and permanent board deletion/retention is **PLANNED**.
 
 ## Docs and skills
 

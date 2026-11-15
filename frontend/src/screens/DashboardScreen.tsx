@@ -1,8 +1,10 @@
 import {
+  Archive,
   Copy,
   LayoutGrid,
   MoreHorizontal,
   Plus,
+  RotateCcw,
   Star,
   Trash2,
 } from 'lucide-react'
@@ -24,6 +26,14 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -31,15 +41,21 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast-context'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import {
+  archiveBoard,
   createBoard as createBoardRequest,
   getBoards,
+  getSessionWorkspace,
+  restoreBoardLifecycle,
   toBoard,
   toggleStarBoard,
+  trashBoard,
   warnFallback,
+  type ApiBoardStatus,
 } from '@/api/client'
 
 const userById = new Map(users.map((user) => [user.id, user]))
@@ -50,18 +66,29 @@ function membersOf(board: Board) {
     .filter((user) => user !== undefined)
 }
 
+type LifecycleAction = 'archive' | 'trash'
+type BoardView = 'boards' | 'archive' | 'trash'
+
 function BoardCard({
   board,
+  view,
   onToggleStar,
-  onDelete,
+  onArchive,
+  onTrash,
+  onRestore,
 }: {
   board: Board
+  view: BoardView
   onToggleStar: (id: string) => void
-  onDelete: (id: string) => void
+  onArchive: (board: Board) => void
+  onTrash: (board: Board) => void
+  onRestore: (board: Board) => void
 }) {
   const { toast } = useToast()
   const { t } = useI18n()
   const members = membersOf(board)
+  const linkable = view !== 'trash'
+  const canManage = Boolean(board.canManage)
 
   async function copyLink() {
     try {
@@ -75,50 +102,64 @@ function BoardCard({
     }
   }
 
+  const thumbnail = (
+    <BoardThumbnail noteColors={board.noteColors} className="h-32 w-full rounded-none border-0" />
+  )
+
   return (
     <Card className="group overflow-hidden p-0 transition-colors hover:border-border-strong">
-      <Link
-        to={`/board/${board.id}`}
-        className="block rounded-t-card focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        aria-label={t('dashboard.openAria', { title: board.title })}
-      >
-        <BoardThumbnail noteColors={board.noteColors} className="h-32 w-full rounded-none border-0" />
-      </Link>
+      {linkable ? (
+        <Link
+          to={`/board/${board.id}`}
+          className="block rounded-t-card focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          aria-label={t('dashboard.openAria', { title: board.title })}
+        >
+          {thumbnail}
+        </Link>
+      ) : (
+        <div className="rounded-t-card" aria-hidden="true">{thumbnail}</div>
+      )}
       <div className="flex flex-col gap-3 p-4">
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
-            <Link
-              to={`/board/${board.id}`}
-              className="block truncate text-sm font-semibold text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            >
-              {board.title}
-            </Link>
+            {linkable ? (
+              <Link
+                to={`/board/${board.id}`}
+                className="block truncate text-sm font-semibold text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              >
+                {board.title}
+              </Link>
+            ) : (
+              <p className="truncate text-sm font-semibold text-foreground">{board.title}</p>
+            )}
             <p className="mt-0.5 text-caption text-muted-foreground">
               {t('dashboard.updated', {
                 when: board.updatedAtLabel.toLowerCase(),
               })}
             </p>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label={
-              board.starred
-                ? t('dashboard.starRemove', { title: board.title })
-                : t('dashboard.starAdd', { title: board.title })
-            }
-            aria-pressed={board.starred}
-            onClick={() => onToggleStar(board.id)}
-          >
-            <Star
-              className={cn(
-                'size-4',
-                board.starred ? 'fill-primary text-primary' : undefined,
-              )}
-              aria-hidden="true"
-            />
-          </Button>
+          {view === 'boards' ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={
+                board.starred
+                  ? t('dashboard.starRemove', { title: board.title })
+                  : t('dashboard.starAdd', { title: board.title })
+              }
+              aria-pressed={board.starred}
+              onClick={() => onToggleStar(board.id)}
+            >
+              <Star
+                className={cn(
+                  'size-4',
+                  board.starred ? 'fill-primary text-primary' : undefined,
+                )}
+                aria-hidden="true"
+              />
+            </Button>
+          ) : null}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -131,18 +172,37 @@ function BoardCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => undefined} asChild>
-                <Link to={`/board/${board.id}`}>{t('dashboard.open')}</Link>
-              </DropdownMenuItem>
+              {linkable ? (
+                <DropdownMenuItem asChild>
+                  <Link to={`/board/${board.id}`}>{t('dashboard.open')}</Link>
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem onSelect={copyLink}>
                 <Copy className="size-4" aria-hidden="true" />
                 {t('dashboard.copyLink')}
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => onDelete(board.id)}>
-                <Trash2 className="size-4" aria-hidden="true" />
-                {t('dashboard.trash')}
-              </DropdownMenuItem>
+              {view === 'boards' && canManage ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => onArchive(board)}>
+                    <Archive className="size-4" aria-hidden="true" />
+                    {t('dashboard.archive')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => onTrash(board)}>
+                    <Trash2 className="size-4" aria-hidden="true" />
+                    {t('dashboard.trash')}
+                  </DropdownMenuItem>
+                </>
+              ) : null}
+              {view !== 'boards' && canManage ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => onRestore(board)}>
+                    <RotateCcw className="size-4" aria-hidden="true" />
+                    {t('dashboard.restore')}
+                  </DropdownMenuItem>
+                </>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -209,36 +269,57 @@ export function DashboardScreen({ onOpenPalette }: { onOpenPalette: () => void }
   const { t, locale } = useI18n()
   const [searchParams] = useSearchParams()
   const [boardList, setBoardList] = useState<Board[]>(initialBoards)
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadBoards() {
-      try {
-        const remoteBoards = await getBoards()
-        if (!cancelled) {
-          setBoardList(remoteBoards.map((board) => toBoard(board, locale)))
-        }
-      } catch (error) {
-        warnFallback('Boards API', error)
-      }
-    }
-
-    void loadBoards()
-    return () => {
-      cancelled = true
-    }
-  }, [locale])
+  const [loadedView, setLoadedView] = useState<WorkspaceView>('boards')
+  const [loadError, setLoadError] = useState<string | undefined>()
+  const [reloadKey, setReloadKey] = useState(0)
+  const [lifecycleTarget, setLifecycleTarget] = useState<{ board: Board; action: LifecycleAction } | null>(null)
+  const [lifecyclePending, setLifecyclePending] = useState(false)
 
   const requestedView = searchParams.get('view')
   const view: WorkspaceView =
-    requestedView === 'templates' || requestedView === 'trash'
+    requestedView === 'archive' || requestedView === 'templates' || requestedView === 'trash'
       ? requestedView
       : 'boards'
+  const boardView: BoardView = view === 'archive' || view === 'trash' ? view : 'boards'
+  const status: ApiBoardStatus = boardView === 'archive' ? 'archived' : boardView === 'trash' ? 'trashed' : 'active'
+
+  useEffect(() => {
+    if (view === 'templates') return
+    let cancelled = false
+
+    getBoards(undefined, status)
+      .then((remoteBoards) => {
+        if (cancelled) return
+        setBoardList(remoteBoards.map((board) => toBoard(board, locale)))
+        setLoadedView(view)
+        setLoadError(undefined)
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        if (view === 'boards') {
+          warnFallback('Boards API', error)
+          setBoardList(initialBoards)
+        } else {
+          setBoardList([])
+          setLoadError(error instanceof Error ? error.message : t('dashboard.loadFailed'))
+        }
+        setLoadedView(view)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [locale, reloadKey, status, t, view])
+
+  const visibleBoards = useMemo(
+    () => (loadedView === view ? boardList : []),
+    [boardList, loadedView, view],
+  )
+  const pendingView = loadedView !== view
 
   const starred = useMemo(
-    () => boardList.filter((board) => board.starred),
-    [boardList],
+    () => visibleBoards.filter((board) => board.starred),
+    [visibleBoards],
   )
 
   async function createBoard(title = t('dashboard.titleUntitled')) {
@@ -259,10 +340,12 @@ export function DashboardScreen({ onOpenPalette }: { onOpenPalette: () => void }
         locale,
       )
       setBoardList((current) => [created, ...current])
+      setLoadedView('boards')
       navigate(`/board/${created.id}`)
     } catch (error) {
       warnFallback('Board creation', error)
       setBoardList((current) => [newBoard, ...current])
+      setLoadedView('boards')
       navigate(`/board/${id}`)
     }
   }
@@ -289,21 +372,83 @@ export function DashboardScreen({ onOpenPalette }: { onOpenPalette: () => void }
       .catch((error) => warnFallback('Star API', error))
   }
 
+  async function restore(board: Board) {
+    try {
+      await restoreBoardLifecycle(board.id)
+      toast({ title: t('dashboard.restoreToast') })
+      setReloadKey((key) => key + 1)
+    } catch (error) {
+      toast({
+        title: t('dashboard.lifecycleFailed'),
+        description: error instanceof Error ? error.message : undefined,
+      })
+    }
+  }
+
+  async function confirmLifecycle() {
+    if (!lifecycleTarget) return
+    setLifecyclePending(true)
+    try {
+      if (lifecycleTarget.action === 'archive') {
+        await archiveBoard(lifecycleTarget.board.id)
+        toast({ title: t('dashboard.archiveToast') })
+      } else {
+        await trashBoard(lifecycleTarget.board.id)
+        toast({ title: t('dashboard.trashToast') })
+      }
+      setLifecycleTarget(null)
+      setReloadKey((key) => key + 1)
+    } catch (error) {
+      toast({
+        title: t('dashboard.lifecycleFailed'),
+        description: error instanceof Error ? error.message : undefined,
+      })
+    } finally {
+      setLifecyclePending(false)
+    }
+  }
+
   const title =
     view === 'templates'
       ? t('dashboard.title.templates')
-      : view === 'trash'
-        ? t('dashboard.title.trash')
-        : t('dashboard.title.boards')
+      : view === 'archive'
+        ? t('dashboard.title.archive')
+        : view === 'trash'
+          ? t('dashboard.title.trash')
+          : t('dashboard.title.boards')
   const description =
     view === 'templates'
       ? t('dashboard.desc.templates')
-      : view === 'trash'
-        ? t('dashboard.desc.trash')
-        : t('dashboard.desc.boards', {
-            workspace: workspace.name,
-            count: boardList.length,
-          })
+      : view === 'archive'
+        ? t('dashboard.desc.archive', { count: visibleBoards.length })
+        : view === 'trash'
+          ? t('dashboard.desc.trash', { count: visibleBoards.length })
+          : t('dashboard.desc.boards', {
+              workspace: getSessionWorkspace()?.name ?? workspace.name,
+              count: visibleBoards.length,
+            })
+
+  const cardActions = {
+    onArchive: (board: Board) => setLifecycleTarget({ board, action: 'archive' }),
+    onTrash: (board: Board) => setLifecycleTarget({ board, action: 'trash' }),
+    onRestore: (board: Board) => void restore(board),
+  }
+
+  function renderGrid(boards: Board[], targetView: BoardView) {
+    return (
+      <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {boards.map((board) => (
+          <BoardCard
+            key={board.id}
+            board={board}
+            view={targetView}
+            onToggleStar={toggleStar}
+            {...cardActions}
+          />
+        ))}
+      </div>
+    )
+  }
 
   return (
     <AppShell
@@ -312,12 +457,12 @@ export function DashboardScreen({ onOpenPalette }: { onOpenPalette: () => void }
       description={description}
       onOpenPalette={onOpenPalette}
       actions={
-        view === 'trash' ? null : (
+        view === 'boards' ? (
           <Button type="button" onClick={() => createBoard()}>
             <Plus className="size-4" aria-hidden="true" />
             {t('dashboard.newBoard')}
           </Button>
-        )
+        ) : null
       }
     >
       {view === 'boards' ? (
@@ -331,21 +476,7 @@ export function DashboardScreen({ onOpenPalette }: { onOpenPalette: () => void }
                 </h2>
                 <Badge variant="neutral">{starred.length}</Badge>
               </div>
-              <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {starred.map((board) => (
-                  <BoardCard
-                    key={board.id}
-                    board={board}
-                    onToggleStar={toggleStar}
-                    onDelete={(id) => {
-                      setBoardList((current) =>
-                        current.filter((item) => item.id !== id),
-                      )
-                      toast({ title: t('dashboard.trashToast') })
-                    }}
-                  />
-                ))}
-              </div>
+              {renderGrid(starred, 'boards')}
             </section>
           ) : null}
 
@@ -358,7 +489,13 @@ export function DashboardScreen({ onOpenPalette }: { onOpenPalette: () => void }
                 {t('dashboard.sorted')}
               </span>
             </div>
-            {boardList.length === 0 ? (
+            {pendingView ? (
+              <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true">
+                <Skeleton className="h-56 w-full" />
+                <Skeleton className="h-56 w-full" />
+                <Skeleton className="h-56 w-full" />
+              </div>
+            ) : visibleBoards.length === 0 ? (
               <EmptyState
                 icon={LayoutGrid}
                 title={t('dashboard.empty.title')}
@@ -372,21 +509,7 @@ export function DashboardScreen({ onOpenPalette }: { onOpenPalette: () => void }
                 className="mt-3"
               />
             ) : (
-              <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {boardList.map((board) => (
-                  <BoardCard
-                    key={board.id}
-                    board={board}
-                    onToggleStar={toggleStar}
-                    onDelete={(id) => {
-                      setBoardList((current) =>
-                        current.filter((item) => item.id !== id),
-                      )
-                      toast({ title: t('dashboard.trashToast') })
-                    }}
-                  />
-                ))}
-              </div>
+              renderGrid(visibleBoards, 'boards')
             )}
           </section>
 
@@ -427,14 +550,89 @@ export function DashboardScreen({ onOpenPalette }: { onOpenPalette: () => void }
         </div>
       ) : null}
 
-      {view === 'trash' ? (
-        <EmptyState
-          icon={Trash2}
-          title={t('dashboard.emptyTrash')}
-          description={t('dashboard.emptyTrashDesc')}
-          className="mt-6 bg-surface"
-        />
+      {view === 'archive' || view === 'trash' ? (
+        pendingView ? (
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true">
+            <Skeleton className="h-56 w-full" />
+            <Skeleton className="h-56 w-full" />
+            <Skeleton className="h-56 w-full" />
+          </div>
+        ) : loadError ? (
+          <EmptyState
+            icon={Archive}
+            title={t('dashboard.loadFailed')}
+            description={loadError}
+            action={
+              <Button type="button" variant="secondary" onClick={() => setReloadKey((key) => key + 1)}>
+                {t('dashboard.retry')}
+              </Button>
+            }
+            className="mt-6 bg-surface"
+          />
+        ) : visibleBoards.length === 0 ? (
+          <EmptyState
+            icon={view === 'archive' ? Archive : Trash2}
+            title={view === 'archive' ? t('dashboard.emptyArchive') : t('dashboard.emptyTrash')}
+            description={
+              view === 'archive'
+                ? t('dashboard.emptyArchiveDesc')
+                : t('dashboard.emptyTrashDesc')
+            }
+            className="mt-6 bg-surface"
+          />
+        ) : (
+          renderGrid(visibleBoards, view)
+        )
       ) : null}
+
+      <Dialog
+        open={lifecycleTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setLifecycleTarget(null)
+        }}
+      >
+        <DialogContent>
+          {lifecycleTarget ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  {t(
+                    lifecycleTarget.action === 'archive'
+                      ? 'dashboard.archiveTitle'
+                      : 'dashboard.trashTitle',
+                    { title: lifecycleTarget.board.title },
+                  )}
+                </DialogTitle>
+                <DialogDescription>
+                  {t(
+                    lifecycleTarget.action === 'archive'
+                      ? 'dashboard.archiveBody'
+                      : 'dashboard.trashBody',
+                    { title: lifecycleTarget.board.title },
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button type="button" variant="secondary" onClick={() => setLifecycleTarget(null)}>
+                  {t('common.cancel')}
+                </Button>
+                <Button
+                  type="button"
+                  variant={lifecycleTarget.action === 'trash' ? 'destructive' : 'primary'}
+                  loading={lifecyclePending}
+                  onClick={() => void confirmLifecycle()}
+                >
+                  {t(
+                    lifecycleTarget.action === 'archive'
+                      ? 'dashboard.archiveConfirm'
+                      : 'dashboard.trashConfirm',
+                  )}
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </AppShell>
   )
 }

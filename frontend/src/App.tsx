@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { CommandPalette } from '@/components/command/CommandPalette'
 import { ToastProvider } from '@/components/ui/toast'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -18,6 +18,15 @@ function AppRoutes() {
   const openPalette = useCallback(() => setPaletteOpen(true), [])
   // Guards read the session token; subscribe to location so they re-evaluate after sign-in.
   const location = useLocation()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    function onSessionExpired() {
+      navigate('/sign-in?expired=1', { replace: true })
+    }
+    window.addEventListener('mosaiq:session-expired', onSessionExpired)
+    return () => window.removeEventListener('mosaiq:session-expired', onSessionExpired)
+  }, [navigate])
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

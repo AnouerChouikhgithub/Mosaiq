@@ -30,9 +30,10 @@ VITE_API_BASE_URL=http://127.0.0.1:8001/api
 ```
 
 Requests carry the session bearer token from `sessionStorage`, time out after 5 seconds, and
-surface the API's `{ "error": … }` message when one is returned. Screens keep working with the
-typed data in `src/mocks/` when the API is unreachable, and log a single warning through
-`warnFallback`; that fallback is demo behaviour, not persistence.
+surface the API's `{ "error": … }` message when one is returned. An authenticated 401 clears the
+session and redirects to `/sign-in?expired=1`; login/registration 401s remain credential errors.
+Screens keep working with the typed data in `src/mocks/` when the API is unreachable, and log a
+single warning through `warnFallback`; that fallback is demo behaviour, not persistence.
 
 ## Structure
 

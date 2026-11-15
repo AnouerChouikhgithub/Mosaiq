@@ -61,8 +61,8 @@ class Workspace
         \DateTimeImmutable $renewsOn,
         ?\DateTimeImmutable $now = null,
     ) {
-        if ('' === trim($name)) {
-            throw new \InvalidArgumentException('Workspace name is required.');
+        if ('' === trim($name) || strlen(trim($name)) > 120) {
+            throw new \InvalidArgumentException('Workspace name must be between 1 and 120 characters.');
         }
         if (!in_array($plan, self::PLANS, true)) {
             throw new \InvalidArgumentException('Workspace plan is not supported.');
@@ -138,10 +138,36 @@ class Workspace
 
     public function rename(string $name): void
     {
-        if ('' === trim($name)) {
-            throw new \InvalidArgumentException('Workspace name is required.');
+        $name = trim($name);
+        if (strlen($name) < 2 || strlen($name) > 120) {
+            throw new \InvalidArgumentException('Workspace name must be between 2 and 120 characters.');
         }
-        $this->name = trim($name);
+        $this->name = $name;
+    }
+
+    /** @return list<User> */
+    public function getActiveMembers(): array
+    {
+        return array_values(array_filter(
+            $this->users->toArray(),
+            static fn (User $user): bool => $user->hasActiveWorkspaceMembership(),
+        ));
+    }
+
+    public function getActiveMemberCount(): int
+    {
+        return count($this->getActiveMembers());
+    }
+
+    public function getOwner(): ?User
+    {
+        foreach ($this->getActiveMembers() as $user) {
+            if ($user->isWorkspaceOwner()) {
+                return $user;
+            }
+        }
+
+        return null;
     }
 
     public function changePlan(string $plan, int $pricePerMember): void

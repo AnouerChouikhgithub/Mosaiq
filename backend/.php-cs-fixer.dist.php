@@ -2,6 +2,8 @@
 
 $finder = (new PhpCsFixer\Finder())
     ->in(__DIR__)
+    // Applied migrations are immutable and must not be reformatted afterwards.
+    ->exclude('migrations')
     ->exclude('var')
     ->notPath([
         'config/bundles.php',

@@ -92,6 +92,7 @@ final class CanvasSerializer
             'name' => $user->getName(),
             'email' => $user->getEmail(),
             'role' => $user->getRole(),
+            'status' => $user->getMembershipStatus(),
             'city' => $user->getCity(),
             'accent' => $user->getAccent(),
         ];

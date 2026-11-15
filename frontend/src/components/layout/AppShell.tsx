@@ -1,4 +1,5 @@
 import {
+  Archive,
   ChevronDown,
   LayoutGrid,
   LayoutTemplate,
@@ -7,10 +8,16 @@ import {
   Settings,
   Trash2,
 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { workspace } from '@/mocks'
-import { getSessionUser, logout } from '@/api/client'
+import {
+  WORKSPACE_UPDATED_EVENT,
+  getSessionUser,
+  getSessionWorkspace,
+  logout,
+  type ApiSessionWorkspace,
+} from '@/api/client'
 import { Logo } from '@/components/brand/Logo'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -27,7 +34,7 @@ import { useToast } from '@/components/ui/toast-context'
 import { useI18n, type TranslationKey } from '@/i18n'
 import { cn } from '@/lib/utils'
 
-export type WorkspaceView = 'boards' | 'templates' | 'trash' | 'settings'
+export type WorkspaceView = 'boards' | 'archive' | 'templates' | 'trash' | 'settings'
 
 const navigation: {
   view: WorkspaceView
@@ -36,6 +43,12 @@ const navigation: {
   to: string
 }[] = [
   { view: 'boards', labelKey: 'nav.boards', icon: LayoutGrid, to: '/' },
+  {
+    view: 'archive',
+    labelKey: 'nav.archive',
+    icon: Archive,
+    to: '/?view=archive',
+  },
   {
     view: 'templates',
     labelKey: 'nav.templates',
@@ -77,6 +90,18 @@ export function AppShell({
   const { toast } = useToast()
   const { t } = useI18n()
   const currentUser = getSessionUser()
+  const [sessionWorkspace, setSessionWorkspace] = useState<ApiSessionWorkspace | null>(() => getSessionWorkspace())
+
+  useEffect(() => {
+    function onWorkspaceUpdated(event: Event) {
+      setSessionWorkspace((event as CustomEvent<ApiSessionWorkspace>).detail)
+    }
+    window.addEventListener(WORKSPACE_UPDATED_EVENT, onWorkspaceUpdated)
+    return () => window.removeEventListener(WORKSPACE_UPDATED_EVENT, onWorkspaceUpdated)
+  }, [])
+
+  const workspaceName = sessionWorkspace?.name ?? workspace.name
+  const workspaceMemberCount = sessionWorkspace?.memberCount ?? workspace.seats
 
   return (
     <div className="flex min-h-svh bg-background text-foreground">
@@ -102,10 +127,10 @@ export function AppShell({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium">
-                    {workspace.name}
+                    {workspaceName}
                   </span>
                   <span className="block text-caption text-muted-foreground">
-                    {t('workspace.members', { count: workspace.seats })}
+                    {t('workspace.members', { count: workspaceMemberCount })}
                   </span>
                 </span>
                 <ChevronDown
@@ -120,7 +145,7 @@ export function AppShell({
                 onSelect={() => navigate('/')}
                 className="justify-between"
               >
-                {workspace.name}
+                {workspaceName}
                 <Badge variant="primary">{t('workspace.active')}</Badge>
               </DropdownMenuItem>
               <DropdownMenuItem

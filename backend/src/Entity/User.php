@@ -14,10 +14,16 @@ use Symfony\Component\Security\Core\User\UserInterface;
 #[ORM\Table(name: 'users')]
 #[ORM\UniqueConstraint(name: 'uniq_users_email', fields: ['email'])]
 #[ORM\Index(name: 'idx_users_workspace', fields: ['workspace'])]
+#[ORM\Index(name: 'idx_users_workspace_status', fields: ['workspace', 'membershipStatus'])]
 #[ORM\UniqueConstraint(name: 'uniq_users_api_token_hash', columns: ['api_token_hash'])]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     public const ROLES = ['Owner', 'Admin', 'Editor', 'Commenter', 'Viewer'];
+    public const ADMIN_ROLES = ['Owner', 'Admin'];
+    public const MEMBER_ROLES = ['Editor', 'Commenter', 'Viewer'];
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_REMOVED = 'removed';
+    public const MEMBERSHIP_STATUSES = [self::STATUS_ACTIVE, self::STATUS_REMOVED];
     public const ACCENTS = ['cursor-1', 'cursor-2', 'cursor-3'];
 
     #[ORM\Id]
@@ -39,6 +45,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 16)]
     private string $role;
 
+    #[ORM\Column(name: 'membership_status', length: 16, options: ['default' => self::STATUS_ACTIVE])]
+    private string $membershipStatus = self::STATUS_ACTIVE;
+
+    #[ORM\Column(name: 'membership_updated_at', type: 'datetimetz_immutable')]
+    private \DateTimeImmutable $membershipUpdatedAt;
+
     #[ORM\Column(length: 120)]
     private string $city;
 
@@ -50,6 +62,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(name: 'api_token_hash', length: 64, nullable: true)]
     private ?string $apiTokenHash = null;
+
+    #[ORM\Column(name: 'api_token_expires_at', type: 'datetimetz_immutable', nullable: true)]
+    private ?\DateTimeImmutable $apiTokenExpiresAt = null;
 
     #[ORM\Column(name: 'created_at', type: 'datetimetz_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -83,6 +98,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->city = trim($city);
         $this->accent = $accent;
         $this->createdAt = $now ?? new \DateTimeImmutable();
+        $this->membershipUpdatedAt = $this->createdAt;
     }
 
     public function getId(): string
@@ -125,6 +141,36 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->createdAt;
     }
 
+    public function getMembershipStatus(): string
+    {
+        return $this->membershipStatus;
+    }
+
+    public function getMembershipUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->membershipUpdatedAt;
+    }
+
+    public function hasActiveWorkspaceMembership(): bool
+    {
+        return self::STATUS_ACTIVE === $this->membershipStatus;
+    }
+
+    public function isWorkspaceOwner(): bool
+    {
+        return $this->hasActiveWorkspaceMembership() && 'Owner' === $this->role;
+    }
+
+    public function removeFromWorkspace(?\DateTimeImmutable $now = null): void
+    {
+        if ('Owner' === $this->role) {
+            throw new \InvalidArgumentException('The workspace owner cannot be removed.');
+        }
+        $this->membershipStatus = self::STATUS_REMOVED;
+        $this->membershipUpdatedAt = $now ?? new \DateTimeImmutable();
+        $this->revokeApiToken();
+    }
+
     public function getPassword(): ?string
     {
         return $this->passwordHash;
@@ -140,9 +186,30 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->apiTokenHash;
     }
 
-    public function setApiTokenHash(?string $apiTokenHash): void
+    public function getApiTokenExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->apiTokenExpiresAt;
+    }
+
+    public function issueApiToken(string $apiTokenHash, \DateTimeImmutable $expiresAt): void
     {
         $this->apiTokenHash = $apiTokenHash;
+        $this->apiTokenExpiresAt = $expiresAt;
+    }
+
+    public function revokeApiToken(): void
+    {
+        $this->apiTokenHash = null;
+        $this->apiTokenExpiresAt = null;
+    }
+
+    public function hasValidApiToken(?\DateTimeImmutable $now = null): bool
+    {
+        $now ??= new \DateTimeImmutable();
+
+        return null !== $this->apiTokenHash
+            && null !== $this->apiTokenExpiresAt
+            && $this->apiTokenExpiresAt > $now;
     }
 
     public function updateProfile(string $name, string $city, string $accent): void
@@ -159,22 +226,28 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->accent = $accent;
     }
 
-    public function changeRole(string $role): void
+    public function changeRole(string $role, ?\DateTimeImmutable $now = null): void
     {
         if (!in_array($role, self::ROLES, true)) {
             throw new \InvalidArgumentException('User role is not supported.');
         }
+        if (!$this->hasActiveWorkspaceMembership()) {
+            throw new \InvalidArgumentException('A removed member cannot change workspace role.');
+        }
         $this->role = $role;
+        $this->membershipUpdatedAt = $now ?? new \DateTimeImmutable();
     }
 
     public function canEditBoards(): bool
     {
-        return in_array($this->role, ['Owner', 'Admin', 'Editor'], true);
+        return $this->hasActiveWorkspaceMembership()
+            && in_array($this->role, ['Owner', 'Admin', 'Editor'], true);
     }
 
     public function canAdministerWorkspace(): bool
     {
-        return in_array($this->role, ['Owner', 'Admin'], true);
+        return $this->hasActiveWorkspaceMembership()
+            && in_array($this->role, self::ADMIN_ROLES, true);
     }
 
     /** @return list<string> */

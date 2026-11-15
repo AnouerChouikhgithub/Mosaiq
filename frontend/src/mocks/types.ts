@@ -39,6 +39,8 @@ export interface Board {
   memberIds: string[]
   noteColors: NoteColor[]
   isTemplate?: boolean
+  /** UI hint only; the backend remains the authorization boundary. */
+  canManage?: boolean
 }
 
 export interface BoardTemplate {

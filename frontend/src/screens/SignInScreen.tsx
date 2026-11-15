@@ -21,9 +21,11 @@ export function SignInScreen() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const invitationToken = searchParams.get('invite') ?? undefined
+  const workspaceInvitationToken = searchParams.get('workspaceInvite') ?? undefined
+  const expired = searchParams.get('expired') === '1'
   const { toast } = useToast()
   const { t } = useI18n()
-  const [mode, setMode] = useState<AuthMode>(invitationToken ? 'signup' : 'signin')
+  const [mode, setMode] = useState<AuthMode>(invitationToken || workspaceInvitationToken ? 'signup' : 'signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -38,7 +40,14 @@ export function SignInScreen() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (mode === 'signup' && password.length < 12) {
+    const passwordBytes = new TextEncoder().encode(password).length
+    if (
+      mode === 'signup' &&
+      (passwordBytes < 12 ||
+        passwordBytes > 72 ||
+        !/\p{L}/u.test(password) ||
+        !/\d/.test(password))
+    ) {
       setError(t('signin.passwordLengthError'))
       return
     }
@@ -53,7 +62,7 @@ export function SignInScreen() {
         await login(email, password)
         if (invitationToken) await acceptBoardInvitation(invitationToken)
       } else {
-        await register(name, email, password, invitationToken)
+        await register(name, email, password, invitationToken, workspaceInvitationToken)
       }
       navigate('/', { replace: true })
     } catch (cause) {
@@ -88,6 +97,15 @@ export function SignInScreen() {
               ? t('signin.welcomeDesc')
               : t('signin.createDesc')}
           </p>
+
+          {expired ? (
+            <p
+              role="status"
+              className="mt-4 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-muted-foreground"
+            >
+              {t('signin.sessionExpired')}
+            </p>
+          ) : null}
 
           <SegmentedControl<AuthMode>
             value={mode}
@@ -151,7 +169,7 @@ export function SignInScreen() {
               label={t('signin.password')}
               htmlFor="password"
               error={error}
-              hint={error ? undefined : t('signin.passwordHint')}
+              hint={error || mode === 'signin' ? undefined : t('signin.passwordHint')}
             >
               <Input
                 id="password"

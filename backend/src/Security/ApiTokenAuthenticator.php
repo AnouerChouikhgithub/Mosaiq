@@ -37,7 +37,7 @@ final class ApiTokenAuthenticator extends AbstractAuthenticator implements Authe
 
         return new SelfValidatingPassport(new UserBadge($rawToken, function (string $token): \Symfony\Component\Security\Core\User\UserInterface {
             $user = $this->users->findByApiTokenHash(hash('sha256', $token));
-            if (null === $user) {
+            if (null === $user || !$user->hasValidApiToken() || !$user->hasActiveWorkspaceMembership()) {
                 throw new AuthenticationException('Invalid bearer token.');
             }
 
