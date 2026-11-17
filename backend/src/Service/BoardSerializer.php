@@ -65,7 +65,7 @@ final class BoardSerializer
                     'label' => $entry->getLabel(),
                     'kind' => $entry->getKind(),
                     'reveals' => $entry->getReveals(),
-                    'author' => $this->canvas->user($entry->getAuthor()),
+                    'author' => $this->canvas->collaborator($entry->getAuthor()),
                 ],
                 $board->getTimelineEntries()->toArray(),
             ),

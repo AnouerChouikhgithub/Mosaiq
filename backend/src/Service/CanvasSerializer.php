@@ -27,7 +27,7 @@ final class CanvasSerializer
             'content' => $element->getContent(),
             'color' => $element->getColor(),
             'metadata' => $element->getMetadata(),
-            'author' => $this->user($element->getAuthor()),
+            'author' => $this->collaborator($element->getAuthor()),
             'createdAt' => $element->getCreatedAt()->format(\DATE_ATOM),
         ];
     }
@@ -46,7 +46,8 @@ final class CanvasSerializer
             'content' => $element->getContent(),
             'color' => $element->getColor(),
             'metadata' => $element->getMetadata(),
-            'author' => ['id' => '', 'name' => $element->getAuthor()->getName(), 'email' => '', 'role' => 'Viewer', 'city' => '', 'accent' => 'cursor-1'],
+            // Anonymous readers get the author's display name only.
+            'author' => ['id' => '', 'name' => $element->getAuthor()->getName(), 'role' => 'Viewer', 'accent' => 'cursor-1'],
             'createdAt' => $element->getCreatedAt()->format(\DATE_ATOM),
         ];
     }
@@ -78,11 +79,31 @@ final class CanvasSerializer
             'id' => $message->getId(),
             'content' => $message->getContent(),
             'createdAt' => $message->getCreatedAt()->format(\DATE_ATOM),
-            'author' => $this->user($message->getAuthor()),
+            'author' => $this->collaborator($message->getAuthor()),
         ];
     }
 
     /**
+     * Profile used inside a board: presence, canvas authors and comments only
+     * need the display name, role and cursor accent. Email and city stay out of
+     * these payloads because no board screen uses them.
+     *
+     * @return array<string, mixed>
+     */
+    public function collaborator(User $user): array
+    {
+        return [
+            'id' => $user->getId(),
+            'name' => $user->getName(),
+            'role' => $user->getRole(),
+            'accent' => $user->getAccent(),
+        ];
+    }
+
+    /**
+     * Member directory profile, used where the workspace already lists every
+     * colleague with their email and city (board members, workspace members).
+     *
      * @return array<string, mixed>
      */
     public function user(User $user): array

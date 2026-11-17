@@ -132,7 +132,8 @@ final class BoardApiControllerTest extends ApiFunctionalTestCase
         self::assertArrayNotHasKey('comments', $public);
         self::assertArrayNotHasKey('timeline', $public);
         self::assertSame('Public workshop note', $public['elements'][0]['content']);
-        self::assertSame('', $public['elements'][0]['author']['email']);
+        self::assertArrayNotHasKey('email', $public['elements'][0]['author']);
+        self::assertArrayNotHasKey('city', $public['elements'][0]['author']);
 
         $this->requestAs(null, 'PATCH', '/api/boards/'.$this->board->getId(), ['title' => 'Tampered']);
         self::assertResponseStatusCodeSame(401);

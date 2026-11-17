@@ -48,7 +48,7 @@ final class PresenceApiController extends AbstractController
         $active = $this->presence->findRecentlyActive($board, new \DateTimeImmutable('-15 seconds'));
 
         return $this->json(['presence' => array_map(fn (BoardPresence $presence): array => [
-            'user' => $this->serializer->user($presence->getUser()),
+            'user' => $this->serializer->collaborator($presence->getUser()),
             'x' => $presence->getX(),
             'y' => $presence->getY(),
             'tool' => $presence->getTool(),
@@ -133,7 +133,7 @@ final class PresenceApiController extends AbstractController
 
                 $active = $this->presence->findRecentlyActive($board, new \DateTimeImmutable('-15 seconds'));
                 $presence = array_map(fn (BoardPresence $entry): array => [
-                    'user' => $this->serializer->user($entry->getUser()),
+                    'user' => $this->serializer->collaborator($entry->getUser()),
                     'x' => $entry->getX(),
                     'y' => $entry->getY(),
                     'tool' => $entry->getTool(),
