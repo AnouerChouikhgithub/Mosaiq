@@ -28,6 +28,7 @@ import {
 import type {
   CommentThread,
   NoteColor,
+  NoteSaveState,
   StickyNote as StickyNoteModel,
 } from '@/mocks'
 import {
@@ -63,6 +64,7 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { useToast } from '@/components/ui/toast-context'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
+import { mergeSyncedNotes } from '@/lib/noteSync'
 import {
   createCanvasElement,
   createComment,
@@ -239,7 +241,7 @@ export function BoardEditorScreen({
         if (cancelled) return
         setLiveCursors(items.map(toLiveCursor))
         const synced = elements.filter((element) => element.type === 'note').map(toStickyNote)
-        setNotes((current) => [...synced, ...current.filter((note) => !isRemoteId(note.id))])
+        setNotes((current) => mergeSyncedNotes(current, synced))
       }).catch(() => undefined)
     }, 3000)
     area.addEventListener('pointermove', publish, { passive: true })
@@ -271,7 +273,7 @@ export function BoardEditorScreen({
             void getCanvasElements(boardId).then((elements) => {
               if (cancelled) return
               const synced = elements.filter((element) => element.type === 'note').map(toStickyNote)
-              setNotes((current) => [...synced, ...current.filter((note) => !isRemoteId(note.id))])
+              setNotes((current) => mergeSyncedNotes(current, synced))
             }).catch(() => undefined)
           }
         }, controller.signal)
@@ -338,10 +340,65 @@ export function BoardEditorScreen({
     }
   }
 
+  function setNoteSaveState(id: string, saveState: NoteSaveState) {
+    setNotes((current) =>
+      current.map((note) => (note.id === id ? { ...note, saveState } : note)),
+    )
+  }
+
+  /**
+   * Persists a local note. A failed request keeps the note and its content but
+   * marks it as unsaved so it is never mistaken for a server record; retrying
+   * reuses the same local id and therefore never creates a second server note.
+   */
+  async function persistNote(id: string, note: StickyNoteModel) {
+    if (!apiAuthorId) return
+
+    setNoteSaveState(id, 'saving')
+    try {
+      const created = await createCanvasElement(boardId, {
+        authorId: apiAuthorId,
+        type: 'note',
+        x: note.x,
+        y: note.y,
+        width: note.width,
+        height: note.height,
+        rotation: note.rotation,
+        content: note.text,
+        color: note.color,
+        metadata: {
+          stroke: note.stroke,
+          textSize: note.textSize,
+          align: note.align,
+        },
+      })
+      const saved: StickyNoteModel = {
+        ...toStickyNote(created),
+        saveState: 'saved',
+      }
+      setNotes((current) =>
+        current.map((item) => (item.id === id ? saved : item)),
+      )
+      setSelectedNoteId((current) => (current === id ? saved.id : current))
+    } catch (error) {
+      warnFallback('Canvas save', error)
+      setNoteSaveState(id, 'failed')
+      toast({ title: t('editor.noteSaveFailed') })
+    }
+  }
+
+  function retryNote(id: string) {
+    const note = notes.find((item) => item.id === id)
+    if (!note || !apiReady || !apiAuthorId || note.saveState === 'saving') return
+
+    void persistNote(id, note)
+  }
+
   async function createNoteAt(position: { x: number; y: number }) {
     const width = 220
     const height = 140
     const id = `local-${Date.now()}`
+    const canPersist = apiReady && Boolean(apiAuthorId)
     const note: StickyNoteModel = {
       id,
       text: t('editor.newNote'),
@@ -361,39 +418,18 @@ export function BoardEditorScreen({
       width,
       height,
       rotation: 0,
+      saveState: canPersist ? 'saving' : undefined,
     }
 
     setNotes((current) => [...current, note])
     setSelectedNoteId(id)
     setActiveTool('select')
 
-    if (!apiReady || !apiAuthorId) return
+    // Demo boards have no API record to persist: the note stays local without
+    // pretending to be saved.
+    if (!canPersist) return
 
-    try {
-      const created = await createCanvasElement(boardId, {
-        authorId: apiAuthorId,
-        type: 'note',
-        x: note.x,
-        y: note.y,
-        width: note.width,
-        height: note.height,
-        rotation: note.rotation,
-        content: note.text,
-        color: note.color,
-        metadata: {
-          stroke: note.stroke,
-          textSize: note.textSize,
-          align: note.align,
-        },
-      })
-      const saved = toStickyNote(created)
-      setNotes((current) =>
-        current.map((item) => (item.id === id ? saved : item)),
-      )
-      setSelectedNoteId((current) => (current === id ? saved.id : current))
-    } catch (error) {
-      warnFallback('Canvas save', error)
-    }
+    await persistNote(id, note)
   }
 
   function fitCanvas() {
@@ -671,6 +707,7 @@ export function BoardEditorScreen({
               if (id) setActiveTool('select')
             }}
             onCreateNote={(position) => void createNoteAt(position)}
+            onRetryNote={retryNote}
             onMoveNote={moveNote}
             onEditNote={editNote}
           >

@@ -129,9 +129,15 @@ export const fr = {
   'editor.titleRequired': 'Le titre du tableau ne peut pas être vide.',
   'editor.titleSaved': 'Titre enregistré.',
   'editor.titleSaveFailed': 'Le titre n’a pas pu être enregistré.',
+  'editor.noteSaveFailed':
+    'La note n’a pas pu être enregistrée. Vos modifications restent locales.',
 
   'canvas.aria': 'Canevas du tableau : {count} notes',
   'canvas.previewAria': 'Aperçu du tableau : {count} notes',
+  'canvas.noteSaving': 'Enregistrement…',
+  'canvas.noteSaved': 'Note enregistrée',
+  'canvas.noteFailed': 'Non enregistrée',
+  'canvas.noteRetry': 'Réessayer l’enregistrement de la note',
   'canvas.selectNote': 'Sélectionner la note : {text}',
   'canvas.noteText': 'Texte de la note',
 
@@ -513,9 +519,15 @@ export const en: Record<TranslationKey, string> = {
   'editor.titleRequired': 'A board title cannot be empty.',
   'editor.titleSaved': 'Title saved.',
   'editor.titleSaveFailed': 'The title could not be saved.',
+  'editor.noteSaveFailed':
+    'The note could not be saved. Your changes stay local.',
 
   'canvas.aria': 'Board canvas: {count} notes',
   'canvas.previewAria': 'Board preview: {count} notes',
+  'canvas.noteSaving': 'Saving…',
+  'canvas.noteSaved': 'Note saved',
+  'canvas.noteFailed': 'Not saved',
+  'canvas.noteRetry': 'Retry saving the note',
   'canvas.selectNote': 'Select note: {text}',
   'canvas.noteText': 'Note text',
 
@@ -885,9 +897,14 @@ export const ar: Record<TranslationKey, string> = {
   'editor.titleRequired': 'لا يمكن أن يكون عنوان اللوحة فارغاً.',
   'editor.titleSaved': 'تم حفظ العنوان.',
   'editor.titleSaveFailed': 'تعذّر حفظ العنوان.',
+  'editor.noteSaveFailed': 'تعذّر حفظ الملاحظة. تبقى تعديلاتك محلية.',
 
   'canvas.aria': 'لوحة الرسم: {count} ملاحظات',
   'canvas.previewAria': 'معاينة اللوحة: {count} ملاحظات',
+  'canvas.noteSaving': 'جارٍ الحفظ…',
+  'canvas.noteSaved': 'تم حفظ الملاحظة',
+  'canvas.noteFailed': 'غير محفوظة',
+  'canvas.noteRetry': 'إعادة محاولة حفظ الملاحظة',
   'canvas.selectNote': 'اختر الملاحظة: {text}',
   'canvas.noteText': 'نص الملاحظة',
 

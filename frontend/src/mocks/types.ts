@@ -10,6 +10,8 @@ export type NoteStroke = 'none' | 'thin' | 'dashed'
 export type NoteTextSize = 's' | 'm' | 'l'
 export type NoteAlign = 'left' | 'center' | 'right'
 export type PresenceAccent = 'cursor-1' | 'cursor-2' | 'cursor-3'
+/** Persistence state of a note created in this session. */
+export type NoteSaveState = 'saving' | 'saved' | 'failed'
 
 export interface User {
   id: string
@@ -63,6 +65,8 @@ export interface StickyNote {
   width: number
   height: number
   rotation: number
+  /** Omitted for demo boards and for notes loaded from the API. */
+  saveState?: NoteSaveState
 }
 
 export interface Connector {
