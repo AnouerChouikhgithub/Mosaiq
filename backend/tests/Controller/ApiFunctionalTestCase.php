@@ -101,6 +101,16 @@ abstract class ApiFunctionalTestCase extends WebTestCase
         return $decoded;
     }
 
+    /** Sends an already-encoded body so non-object JSON documents can be tested. */
+    protected function requestWithRawBody(string $method, string $uri, string $content, ?string $token = null): void
+    {
+        $server = ['CONTENT_TYPE' => 'application/json'];
+        if (null !== $token) {
+            $server['HTTP_AUTHORIZATION'] = 'Bearer '.$token;
+        }
+        $this->client->request($method, $uri, server: $server, content: $content);
+    }
+
     protected function createElement(string $token, string $content = 'snapshot note'): string
     {
         $this->requestAs($token, 'POST', '/api/boards/'.$this->board->getId().'/elements', [
