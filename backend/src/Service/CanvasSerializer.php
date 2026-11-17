@@ -57,7 +57,10 @@ final class CanvasSerializer
 
     /**
      * An empty metadata object has to stay `{}` on the wire: a PHP empty array
-     * would serialize as `[]` and look like a JSON array to the client.
+     * would serialize as `[]` and look like a JSON array to the client. The root
+     * value is stored as `[]` because metadata is never a JSON array, so it is
+     * rebuilt here; nested empty objects come back from the database as their
+     * original `stdClass` markers and encode to `{}` unchanged.
      *
      * @param array<string, mixed>|null $metadata
      */
