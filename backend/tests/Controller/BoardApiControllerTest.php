@@ -75,6 +75,85 @@ final class BoardApiControllerTest extends ApiFunctionalTestCase
         self::assertResponseStatusCodeSame($status);
     }
 
+    public function testBoardCreationAcceptsAStringTitle(): void
+    {
+        $this->requestAs($this->ownerToken, 'POST', '/api/boards', ['title' => '  Roadmap 2027  ']);
+
+        self::assertResponseStatusCodeSame(201);
+        self::assertSame('Roadmap 2027', $this->jsonResponse()['title']);
+        // One board, its owner membership and its opening history entry.
+        self::assertSame(2, $this->countRows('boards'));
+        self::assertSame(5, $this->countRows('board_members'));
+        self::assertSame(1, $this->countRows('timeline_entries'));
+    }
+
+    /**
+     * A title that is not a string used to be cast to one, so `["a"]` became the
+     * board title "Array" and the board was created. The invalid payload must be
+     * rejected before the transaction opens, leaving no board, membership or
+     * history entry behind.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function nonStringTitles(): iterable
+    {
+        yield 'empty array' => ['{"title":[]}'];
+        yield 'array with a value' => ['{"title":["Renamed"]}'];
+        yield 'object' => ['{"title":{"name":"Renamed"}}'];
+        yield 'empty object' => ['{"title":{}}'];
+        yield 'integer' => ['{"title":42}'];
+        yield 'float' => ['{"title":1.5}'];
+        yield 'boolean true' => ['{"title":true}'];
+        yield 'boolean false' => ['{"title":false}'];
+    }
+
+    #[DataProvider('nonStringTitles')]
+    public function testBoardCreationRejectsANonStringTitle(string $body): void
+    {
+        $this->requestWithRawBody('POST', '/api/boards', $body, $this->ownerToken);
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertSame(['error' => 'Board title must be a string.'], $this->jsonResponse());
+        self::assertSame(1, $this->countRows('boards'));
+        self::assertSame(4, $this->countRows('board_members'));
+        self::assertSame(0, $this->countRows('timeline_entries'));
+    }
+
+    public function testBoardCreationKeepsItsBehaviourForAMissingTitle(): void
+    {
+        // The body is an object that simply has no title key.
+        $this->requestWithRawBody('POST', '/api/boards', '{}', $this->ownerToken);
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertSame(['error' => 'Board title is required.'], $this->jsonResponse());
+        $this->assertNothingWasCreated();
+    }
+
+    public function testBoardCreationKeepsItsBehaviourForAnEmptyTitle(): void
+    {
+        $this->requestAs($this->ownerToken, 'POST', '/api/boards', ['title' => '']);
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertSame(['error' => 'Board title is required.'], $this->jsonResponse());
+        $this->assertNothingWasCreated();
+    }
+
+    public function testBoardCreationRejectsAWhitespaceOnlyTitle(): void
+    {
+        $this->requestAs($this->ownerToken, 'POST', '/api/boards', ['title' => "   \t  "]);
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertSame(['error' => 'Board title is required.'], $this->jsonResponse());
+        $this->assertNothingWasCreated();
+    }
+
+    private function assertNothingWasCreated(): void
+    {
+        self::assertSame(1, $this->countRows('boards'));
+        self::assertSame(4, $this->countRows('board_members'));
+        self::assertSame(0, $this->countRows('timeline_entries'));
+    }
+
     public function testCreatingBoardUsesAuthenticatedOwnerAndCannotSelectAnotherWorkspace(): void
     {
         $this->requestAs($this->ownerToken, 'POST', '/api/boards', [
