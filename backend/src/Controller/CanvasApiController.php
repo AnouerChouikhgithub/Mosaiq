@@ -45,7 +45,10 @@ final class CanvasApiController extends AbstractController
         try {
             $this->denyAccessUnlessGranted('BOARD_VIEW', $board);
         } catch (AccessDeniedException) {
-            if (!$board->hasPublicAccess()) {
+            // Anonymous link access mirrors BoardApiController::show(): a public
+            // board only exposes its canvas while it is active, never once it has
+            // been archived or moved to the trash.
+            if (!$board->hasPublicAccess() || !$board->isActive()) {
                 return $this->json(['error' => 'Forbidden.'], 403);
             }
         }
