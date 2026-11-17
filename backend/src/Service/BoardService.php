@@ -71,7 +71,9 @@ final class BoardService
      * A JSON array — empty or not — is not an object and is rejected: the
      * decoder keeps `{}` as a `stdClass` marker precisely so the two can be
      * told apart. Nested empty objects are preserved as markers for the same
-     * reason and serialize back to `{}`.
+     * reason: the `json` column type restores them after hydration (see
+     * App\Doctrine\Type\JsonPreservingType) and they serialize back to `{}`,
+     * while nested arrays stay arrays.
      *
      * @return array<string, mixed>|null
      */

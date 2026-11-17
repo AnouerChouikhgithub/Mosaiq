@@ -91,11 +91,19 @@ final class BoardApiController extends AbstractController
             if (!$this->isGranted('WORKSPACE_ADMINISTER', $workspace)) {
                 throw new AccessDeniedException('Only workspace administrators can create boards.');
             }
+            // The title type is checked before the transaction opens: casting an
+            // array, an object or a number would invent a title the client never
+            // sent, and the board would then be created with it. A missing title
+            // keeps its previous behaviour (the entity rejects the empty title).
+            $title = $payload['title'] ?? '';
+            if (!is_string($title)) {
+                throw new \InvalidArgumentException('Board title must be a string.');
+            }
             // One transaction: a board without its opening history entry would be
             // an untracked board, and a failed timeline write must undo it.
             /** @var Board $board */
-            $board = $this->entityManager->wrapInTransaction(function () use ($workspace, $payload, $colors, $user): Board {
-                $board = $this->boardService->createBoard($workspace, (string) ($payload['title'] ?? ''), array_values($colors), $user);
+            $board = $this->entityManager->wrapInTransaction(function () use ($workspace, $title, $colors, $user): Board {
+                $board = $this->boardService->createBoard($workspace, $title, array_values($colors), $user);
                 $board->addMember($user, 'Owner');
                 $this->timeline->record($board, $user, sprintf('%s created the board', $user->getName()), 'board');
 

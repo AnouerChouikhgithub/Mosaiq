@@ -174,6 +174,22 @@ abstract class ApiFunctionalTestCase extends WebTestCase
         }
     }
 
+    /**
+     * Reads one value over a dedicated connection, so the assertion still works
+     * after a request has closed or replaced the entity manager.
+     *
+     * @param array<int|string, mixed> $params
+     */
+    protected function fetchColumn(string $sql, array $params = []): mixed
+    {
+        $connection = DriverManager::getConnection($this->connectionParams);
+        try {
+            return $connection->fetchOne($sql, $params);
+        } finally {
+            $connection->close();
+        }
+    }
+
     protected function createElement(string $token, string $content = 'snapshot note'): string
     {
         $this->requestAs($token, 'POST', '/api/boards/'.$this->board->getId().'/elements', [

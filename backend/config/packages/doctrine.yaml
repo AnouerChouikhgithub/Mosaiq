@@ -2,6 +2,13 @@ doctrine:
     dbal:
         url: '%env(resolve:DATABASE_URL)%'
 
+        # The `json` column type keeps the built-in SQL declaration and API shape
+        # but decodes nested empty objects as objects instead of empty arrays, so
+        # `{"layout":{}}` survives a reload. Overriding the built-in name means
+        # existing columns need no migration. See App\Doctrine\Type\JsonPreservingType.
+        types:
+            json: App\Doctrine\Type\JsonPreservingType
+
         # IMPORTANT: You MUST configure your server version,
         # either here or in the DATABASE_URL env var (see .env file)
         #server_version: '16'

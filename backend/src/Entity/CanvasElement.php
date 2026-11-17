@@ -57,7 +57,14 @@ class CanvasElement
     #[ORM\Column(length: 16, nullable: true)]
     private ?string $color = null;
 
-    /** @var array<string, mixed>|null */
+    /**
+     * Nested empty JSON objects are held as `stdClass` markers, the same value
+     * the request decoder produces and the `json` column type restores on read,
+     * so `{}` never degrades into `[]` on the way back out. JSON arrays stay
+     * arrays.
+     *
+     * @var array<string, mixed>|null
+     */
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $metadata = null;
 
