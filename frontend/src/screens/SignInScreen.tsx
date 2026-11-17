@@ -1,4 +1,4 @@
-import { ArrowRight, Mail, Sparkles, Users } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, Mail, Sparkles, Users } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { boardCanvas, users } from '@/mocks'
@@ -28,6 +28,7 @@ export function SignInScreen() {
   const [mode, setMode] = useState<AuthMode>(invitationToken || workspaceInvitationToken ? 'signup' : 'signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [passwordVisible, setPasswordVisible] = useState(false)
   const [name, setName] = useState('')
   const [error, setError] = useState<string | undefined>()
   const [pending, setPending] = useState(false)
@@ -171,21 +172,42 @@ export function SignInScreen() {
               error={error}
               hint={error || mode === 'signin' ? undefined : t('signin.passwordHint')}
             >
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(event) => {
-                  setPassword(event.target.value)
-                  if (error) setError(undefined)
-                }}
-                placeholder="••••••••"
-                autoComplete={
-                  mode === 'signin' ? 'current-password' : 'new-password'
-                }
-                aria-invalid={Boolean(error)}
-                required
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={passwordVisible ? 'text' : 'password'}
+                  value={password}
+                  onChange={(event) => {
+                    setPassword(event.target.value)
+                    if (error) setError(undefined)
+                  }}
+                  placeholder="••••••••"
+                  autoComplete={
+                    mode === 'signin' ? 'current-password' : 'new-password'
+                  }
+                  aria-invalid={Boolean(error)}
+                  className="pe-11"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setPasswordVisible((visible) => !visible)}
+                  aria-label={t(
+                    passwordVisible ? 'signin.hidePassword' : 'signin.showPassword',
+                  )}
+                  aria-pressed={passwordVisible}
+                  title={t(
+                    passwordVisible ? 'signin.hidePassword' : 'signin.showPassword',
+                  )}
+                  className="absolute end-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  {passwordVisible ? (
+                    <EyeOff className="size-4" aria-hidden="true" />
+                  ) : (
+                    <Eye className="size-4" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
             </Field>
 
             <Button type="submit" size="lg" loading={pending} className="w-full">
