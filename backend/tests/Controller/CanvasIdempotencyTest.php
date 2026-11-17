@@ -14,6 +14,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
  * A canvas create carries a client mutation id. Repeating one operation must
  * return the element the first attempt stored instead of creating a second one,
  * including when the first response never reached the client.
+ *
+ * These tests drive the endpoint one request at a time; the two-process test in
+ * CanvasConcurrencyTest exercises the same guarantee with simultaneous requests.
  */
 final class CanvasIdempotencyTest extends ApiFunctionalTestCase
 {
@@ -172,6 +175,19 @@ final class CanvasIdempotencyTest extends ApiFunctionalTestCase
         self::assertResponseStatusCodeSame(422);
         self::assertSame(['error' => '"mutationId" must be a canonical UUID.'], $this->jsonResponse());
         self::assertSame(0, $this->countRows('canvas_elements'));
+    }
+
+    public function testDifferentMutationIdsCreateDifferentElements(): void
+    {
+        $this->createNote($this->editorToken);
+        $firstId = $this->jsonResponse()['id'];
+
+        $this->createNote($this->editorToken, ['mutationId' => 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d']);
+
+        self::assertResponseStatusCodeSame(201);
+        self::assertNotSame($firstId, $this->jsonResponse()['id']);
+        self::assertSame(2, $this->countRows('canvas_elements'));
+        self::assertSame(2, $this->countRows('timeline_entries'));
     }
 
     public function testCreatesWithoutAMutationIdKeepTheirPreviousBehaviour(): void
