@@ -26,7 +26,10 @@ final class CanvasSerializer
             'rotation' => $element->getRotation(),
             'content' => $element->getContent(),
             'color' => $element->getColor(),
-            'metadata' => $element->getMetadata(),
+            'metadata' => $this->metadata($element->getMetadata()),
+            // Lets the client reconcile a retried create with the element the
+            // server already committed under the same mutation id.
+            'mutationId' => $element->getMutationId(),
             'author' => $this->collaborator($element->getAuthor()),
             'createdAt' => $element->getCreatedAt()->format(\DATE_ATOM),
         ];
@@ -45,11 +48,22 @@ final class CanvasSerializer
             'rotation' => $element->getRotation(),
             'content' => $element->getContent(),
             'color' => $element->getColor(),
-            'metadata' => $element->getMetadata(),
+            'metadata' => $this->metadata($element->getMetadata()),
             // Anonymous readers get the author's display name only.
             'author' => ['id' => '', 'name' => $element->getAuthor()->getName(), 'role' => 'Viewer', 'accent' => 'cursor-1'],
             'createdAt' => $element->getCreatedAt()->format(\DATE_ATOM),
         ];
+    }
+
+    /**
+     * An empty metadata object has to stay `{}` on the wire: a PHP empty array
+     * would serialize as `[]` and look like a JSON array to the client.
+     *
+     * @param array<string, mixed>|null $metadata
+     */
+    private function metadata(?array $metadata): array|\stdClass|null
+    {
+        return [] === $metadata ? new \stdClass() : $metadata;
     }
 
     /**

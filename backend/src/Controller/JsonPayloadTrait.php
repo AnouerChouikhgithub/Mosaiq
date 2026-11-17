@@ -25,21 +25,33 @@ trait JsonPayloadTrait
             throw new \InvalidArgumentException('Request body must be a JSON object.');
         }
 
-        /** @var array<string, mixed> $payload */
-        $payload = $this->normalizeJsonValue($decoded);
-
-        return $payload;
+        return $this->normalizeJsonObject($decoded);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function normalizeJsonObject(\stdClass $object): array
+    {
+        $normalized = [];
+        foreach (get_object_vars($object) as $key => $item) {
+            $normalized[$key] = $this->normalizeJsonValue($item);
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Nested JSON objects become associative arrays so services can read them
+     * like the rest of the payload. The empty object is the one exception: it
+     * stays a `stdClass` marker because collapsing it into `[]` would make it
+     * indistinguishable from an empty JSON array, and `array_is_list()` would
+     * then report `{}` as a list.
+     */
     private function normalizeJsonValue(mixed $value): mixed
     {
         if ($value instanceof \stdClass) {
-            $normalized = [];
-            foreach (get_object_vars($value) as $key => $item) {
-                $normalized[$key] = $this->normalizeJsonValue($item);
-            }
-
-            return $normalized;
+            return [] === get_object_vars($value) ? $value : $this->normalizeJsonObject($value);
         }
 
         if (is_array($value)) {

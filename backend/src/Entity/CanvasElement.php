@@ -10,6 +10,9 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: CanvasElementRepository::class)]
 #[ORM\Table(name: 'canvas_elements')]
+// One client mutation can only ever create one element. Postgres treats NULLs
+// as distinct, so elements created without an idempotency key keep working.
+#[ORM\UniqueConstraint(name: 'uniq_canvas_elements_mutation', columns: ['board_id', 'author_id', 'mutation_id'])]
 #[ORM\Index(name: 'idx_canvas_elements_board', fields: ['board'])]
 #[ORM\Index(name: 'idx_canvas_elements_author', fields: ['author'])]
 class CanvasElement
@@ -57,6 +60,14 @@ class CanvasElement
     /** @var array<string, mixed>|null */
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $metadata = null;
+
+    /** Idempotency key of the create operation that produced this element. */
+    #[ORM\Column(name: 'mutation_id', length: 36, nullable: true)]
+    private ?string $mutationId = null;
+
+    /** Fingerprint of the create payload, used to detect a reused key. */
+    #[ORM\Column(name: 'request_hash', length: 64, nullable: true)]
+    private ?string $requestHash = null;
 
     #[ORM\Column(name: 'created_at', type: 'datetimetz_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -163,6 +174,36 @@ class CanvasElement
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
+    }
+
+    public function getMutationId(): ?string
+    {
+        return $this->mutationId;
+    }
+
+    public function getRequestHash(): ?string
+    {
+        return $this->requestHash;
+    }
+
+    /**
+     * Binds the element to the client mutation that created it. The unique index
+     * on (board, author, mutation id) is what makes a retried create safe.
+     */
+    public function assignMutation(string $mutationId, string $requestHash): void
+    {
+        if (null !== $this->mutationId) {
+            throw new \LogicException('The canvas element already belongs to a mutation.');
+        }
+
+        $this->mutationId = $mutationId;
+        $this->requestHash = $requestHash;
+    }
+
+    /** True when a retry carries the payload this element was created with. */
+    public function matchesMutationPayload(string $requestHash): bool
+    {
+        return null !== $this->requestHash && hash_equals($this->requestHash, $requestHash);
     }
 
     public function updateGeometry(float $x, float $y, float $width, float $height, float $rotation): void

@@ -64,6 +64,7 @@ import { Tooltip } from '@/components/ui/tooltip'
 import { useToast } from '@/components/ui/toast-context'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
+import { createMutationId } from '@/lib/mutationId'
 import { mergeSyncedNotes } from '@/lib/noteSync'
 import {
   createCanvasElement,
@@ -347,17 +348,28 @@ export function BoardEditorScreen({
   }
 
   /**
-   * Persists a local note. A failed request keeps the note and its content but
-   * marks it as unsaved so it is never mistaken for a server record; retrying
-   * reuses the same local id and therefore never creates a second server note.
+   * Persists a local note under the mutation id minted when it was created. A
+   * failed request is not proof that the server did not persist the note, so a
+   * retry reuses the same key: the server replays the stored element instead of
+   * creating a second note.
    */
   async function persistNote(id: string, note: StickyNoteModel) {
     if (!apiAuthorId) return
+
+    // Notes always get a key at creation; a note without one keeps the key it
+    // mints here for its own retries too.
+    const mutationId = note.mutationId ?? createMutationId()
+    if (!note.mutationId) {
+      setNotes((current) =>
+        current.map((item) => (item.id === id ? { ...item, mutationId } : item)),
+      )
+    }
 
     setNoteSaveState(id, 'saving')
     try {
       const created = await createCanvasElement(boardId, {
         authorId: apiAuthorId,
+        mutationId,
         type: 'note',
         x: note.x,
         y: note.y,
@@ -397,10 +409,16 @@ export function BoardEditorScreen({
   async function createNoteAt(position: { x: number; y: number }) {
     const width = 220
     const height = 140
-    const id = `local-${Date.now()}`
+    // The local id is derived from the mutation id so two notes created in the
+    // same millisecond can never share an id, and so both stay visibly local.
+    const mutationId = createMutationId()
+    const id = `local-${mutationId}`
     const canPersist = apiReady && Boolean(apiAuthorId)
     const note: StickyNoteModel = {
       id,
+      // One key per logical create: every retry of this note reuses it, while a
+      // second note gets its own key even at the same position.
+      mutationId,
       text: t('editor.newNote'),
       authorId: currentUserId,
       color: activeColor,

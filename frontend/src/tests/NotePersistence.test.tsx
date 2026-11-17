@@ -218,6 +218,91 @@ describe('editor note persistence', () => {
     )
   })
 
+  it('sends the same mutation id to the initial request and the retry', async () => {
+    api.createCanvasElement.mockRejectedValueOnce(new Error('offline'))
+
+    await renderEditor()
+    const retry = await screen.findByRole('button', { name: 'Réessayer l’enregistrement de la note' })
+    fireEvent.click(retry)
+    expect(await screen.findByText('Note enregistrée')).toBeTruthy()
+
+    const keys = api.createCanvasElement.mock.calls.map(
+      (call) => (call[1] as { mutationId: string }).mutationId,
+    )
+    expect(keys).toHaveLength(2)
+    expect(keys[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(keys[1]).toBe(keys[0])
+  })
+
+  it('reconciles a lost response without creating a second note', async () => {
+    // Fake server: it commits the note, then the response is lost. The retry
+    // must replay the committed element instead of storing a copy.
+    const stored = new Map<string, typeof api.element>()
+    let loseFirstResponse = true
+    api.createCanvasElement.mockImplementation(
+      async (_boardId: string, input: { mutationId?: string }) => {
+        const key = input.mutationId ?? ''
+        const committed = stored.get(key)
+        if (committed) return committed
+        stored.set(key, api.element)
+        if (loseFirstResponse) {
+          loseFirstResponse = false
+          throw new Error('Network error after the server committed the note')
+        }
+        return api.element
+      },
+    )
+
+    await renderEditor()
+    expect(await screen.findByText('Non enregistrée')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Réessayer l’enregistrement de la note' }))
+    expect(await screen.findByText('Note enregistrée')).toBeTruthy()
+
+    expect(stored.size).toBe(1)
+    expect(screen.getAllByText('Nouvelle note')).toHaveLength(1)
+    const keys = api.createCanvasElement.mock.calls.map(
+      (call) => (call[1] as { mutationId: string }).mutationId,
+    )
+    expect(keys[0]).toBe(keys[1])
+  })
+
+  it('does not show a duplicate when the poll finds the note a failed request committed', async () => {
+    api.createCanvasElement.mockRejectedValueOnce(new Error('timeout'))
+
+    await renderEditor()
+    expect(await screen.findByText('Non enregistrée')).toBeTruthy()
+
+    const mutationId = (api.createCanvasElement.mock.calls[0][1] as { mutationId: string }).mutationId
+    // The server did persist it: the poll returns the element under the same key.
+    api.getCanvasElements.mockResolvedValue([{ ...api.element, mutationId }])
+    await runPoll()
+
+    expect(screen.getAllByText('Nouvelle note')).toHaveLength(1)
+    expect(screen.queryByText('Non enregistrée')).toBeNull()
+  })
+
+  it('mints a different mutation id for each genuinely new note', async () => {
+    let created = 0
+    api.createCanvasElement.mockImplementation(async () => ({
+      ...api.element,
+      id: `11111111-1111-4111-8111-33333333333${created++}`,
+    }))
+
+    await renderEditor()
+    expect(await screen.findByText('Note enregistrée')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Note' }))
+    fireEvent.click(screen.getByRole('group', { name: /Canevas du tableau/ }).firstElementChild as HTMLElement)
+
+    await waitFor(() => expect(api.createCanvasElement).toHaveBeenCalledTimes(2))
+    const keys = api.createCanvasElement.mock.calls.map(
+      (call) => (call[1] as { mutationId: string }).mutationId,
+    )
+    expect(keys[0]).not.toBe(keys[1])
+    expect(screen.getAllByText('Nouvelle note')).toHaveLength(2)
+  })
+
   it('preserves a pending note through polling and never duplicates it once saved', async () => {
     let resolveCreate: (value: typeof api.element) => void = () => undefined
     api.createCanvasElement.mockImplementationOnce(
@@ -276,5 +361,24 @@ describe('canvas note reconciliation', () => {
     const reconciled = mergeSyncedNotes([{ ...persisted, text: 'Ancienne' }, pending], [renamedOnServer])
 
     expect(reconciled).toStrictEqual([renamedOnServer, pending])
+  })
+
+  it('drops a local note once the server reports its mutation id', () => {
+    const committed = { ...persisted, mutationId: 'mutation-1' }
+    const reconciled = mergeSyncedNotes(
+      [{ ...failed, mutationId: 'mutation-1' }],
+      [committed],
+    )
+
+    expect(reconciled).toStrictEqual([committed])
+  })
+
+  it('keeps a local note whose mutation id the server has not reported yet', () => {
+    const reconciled = mergeSyncedNotes(
+      [{ ...failed, mutationId: 'mutation-1' }],
+      [{ ...persisted, mutationId: 'mutation-2' }],
+    )
+
+    expect(reconciled.map((note) => note.id)).toEqual([persisted.id, failed.id])
   })
 })
