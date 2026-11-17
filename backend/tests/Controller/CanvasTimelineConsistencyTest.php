@@ -6,13 +6,11 @@ namespace App\Tests\Controller;
 
 use App\Entity\CanvasElement;
 use App\Entity\TimelineEntry;
-use Doctrine\ORM\Event\OnFlushEventArgs;
-use Doctrine\ORM\Events;
 
 /**
- * The canvas mutation and the timeline entry it produces must commit together:
- * a history write that fails has to roll the canvas change back instead of
- * leaving an untracked element behind.
+ * Every canvas mutation and the timeline entry it produces must commit together:
+ * a history write that fails has to roll that mutation back instead of leaving an
+ * untracked canvas change behind.
  */
 final class CanvasTimelineConsistencyTest extends ApiFunctionalTestCase
 {
@@ -74,32 +72,65 @@ final class CanvasTimelineConsistencyTest extends ApiFunctionalTestCase
         // The failing request must reuse this entity manager so the injected
         // listener observes the flush it performs.
         $connection = $this->entityManager->getConnection();
-        $this->entityManager->getEventManager()->addEventListener([Events::onFlush], new class {
-            public function onFlush(OnFlushEventArgs $args): void
-            {
-                foreach ($args->getObjectManager()->getUnitOfWork()->getScheduledEntityInsertions() as $entity) {
-                    if ($entity instanceof TimelineEntry) {
-                        throw new \RuntimeException('Simulated timeline storage failure.');
-                    }
-                }
-            }
-        });
+        $this->failTimelinePersistence();
 
-        $failed = false;
-        try {
+        $this->assertRequestFailedWithStorageError(function (): void {
             $this->requestAs($this->editorToken, 'POST', '/api/boards/'.$this->board->getId().'/elements', [
                 'type' => 'note', 'x' => 10, 'y' => 20, 'width' => 220, 'height' => 140, 'content' => 'must roll back',
             ]);
-            $failed = $this->client->getResponse()->getStatusCode() >= 500;
-        } catch (\RuntimeException $exception) {
-            $failed = str_contains($exception->getMessage(), 'Simulated timeline storage failure.');
-        }
-
-        self::assertTrue($failed, 'The timeline failure must surface instead of being swallowed.');
+        });
 
         // The canvas insert was flushed inside the transaction before the
         // timeline entry failed, so these counts prove the rollback is real.
         self::assertSame(0, (int) $connection->fetchOne('SELECT COUNT(*) FROM canvas_elements'));
         self::assertSame(0, (int) $connection->fetchOne('SELECT COUNT(*) FROM timeline_entries'));
+    }
+
+    public function testFailedTimelineWriteRestoresTheUpdatedElement(): void
+    {
+        $elementId = $this->persistElement('before');
+        $connection = $this->entityManager->getConnection();
+        $this->failTimelinePersistence();
+
+        $this->assertRequestFailedWithStorageError(function () use ($elementId): void {
+            $this->requestAs($this->editorToken, 'PATCH', '/api/elements/'.$elementId, [
+                'content' => 'after', 'x' => 999,
+            ]);
+        });
+
+        // The update was flushed before the timeline write failed, so the stored
+        // row is the only proof that the transaction undid it.
+        $stored = $connection->fetchAssociative('SELECT content, x FROM canvas_elements WHERE id = ?', [$elementId]);
+        self::assertIsArray($stored);
+        self::assertSame('before', $stored['content']);
+        self::assertSame(120.0, (float) $stored['x']);
+        self::assertSame(0, $this->countRows('timeline_entries'));
+    }
+
+    public function testFailedTimelineWriteRestoresTheDeletedElement(): void
+    {
+        $elementId = $this->persistElement('keep me');
+        $connection = $this->entityManager->getConnection();
+        $this->failTimelinePersistence();
+
+        $this->assertRequestFailedWithStorageError(function () use ($elementId): void {
+            $this->requestAs($this->editorToken, 'DELETE', '/api/elements/'.$elementId);
+        });
+
+        self::assertSame(1, (int) $connection->fetchOne('SELECT COUNT(*) FROM canvas_elements WHERE id = ?', [$elementId]));
+        self::assertSame(0, $this->countRows('timeline_entries'));
+    }
+
+    /**
+     * Stores an element without an HTTP request, so a failing test can keep its
+     * one request for the mutation whose rollback it asserts.
+     */
+    private function persistElement(string $content): string
+    {
+        $element = new CanvasElement($this->board, $this->editor, 'note', 120.0, 130.0, 220.0, 150.0, 0.0, $content, 'amber');
+        $this->entityManager->persist($element);
+        $this->entityManager->flush();
+
+        return $element->getId();
     }
 }

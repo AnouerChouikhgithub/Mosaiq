@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\Board;
+use App\Entity\TimelineEntry;
 use App\Entity\User;
 use App\Entity\Workspace;
+use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Event\OnFlushEventArgs;
+use Doctrine\ORM\Events;
 use Doctrine\ORM\Tools\SchemaTool;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -30,11 +34,20 @@ abstract class ApiFunctionalTestCase extends WebTestCase
     protected string $viewerToken = 'viewer-test-token-1234567890123456';
     protected string $outsiderToken = 'outsider-test-token-12345678901234';
 
+    /**
+     * Captured before any request can replace the entity manager, so database
+     * assertions keep working after a request shuts its own manager down.
+     *
+     * @var array<string, mixed>
+     */
+    private array $connectionParams = [];
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->client = self::createClient();
         $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $this->connectionParams = $this->entityManager->getConnection()->getParams();
         $metadata = $this->entityManager->getMetadataFactory()->getAllMetadata();
         $schema = new SchemaTool($this->entityManager);
 
@@ -109,6 +122,56 @@ abstract class ApiFunctionalTestCase extends WebTestCase
             $server['HTTP_AUTHORIZATION'] = 'Bearer '.$token;
         }
         $this->client->request($method, $uri, server: $server, content: $content);
+    }
+
+    /**
+     * Fails every flush that schedules a timeline insert: the exact persistence
+     * boundary a real storage failure would hit. The request under test must run
+     * in this process's entity manager for the listener to observe its flush.
+     */
+    protected function failTimelinePersistence(): void
+    {
+        $this->entityManager->getEventManager()->addEventListener([Events::onFlush], new class {
+            public function onFlush(OnFlushEventArgs $args): void
+            {
+                foreach ($args->getObjectManager()->getUnitOfWork()->getScheduledEntityInsertions() as $entity) {
+                    if ($entity instanceof TimelineEntry) {
+                        throw new \RuntimeException('Simulated timeline storage failure.');
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * Runs a request that is expected to die at the persistence boundary. The
+     * failure must surface: a swallowed exception would hide a partial write.
+     */
+    protected function assertRequestFailedWithStorageError(callable $request): void
+    {
+        $failed = false;
+        try {
+            $request();
+            $failed = $this->client->getResponse()->getStatusCode() >= 500;
+        } catch (\RuntimeException $exception) {
+            $failed = str_contains($exception->getMessage(), 'Simulated timeline storage failure.');
+        }
+
+        self::assertTrue($failed, 'The timeline failure must surface instead of being swallowed.');
+    }
+
+    /**
+     * Counts rows over a dedicated connection so the assertion is unaffected by
+     * a request that closed or replaced the entity manager.
+     */
+    protected function countRows(string $table): int
+    {
+        $connection = DriverManager::getConnection($this->connectionParams);
+        try {
+            return (int) $connection->fetchOne(sprintf('SELECT COUNT(*) FROM %s', $table));
+        } finally {
+            $connection->close();
+        }
     }
 
     protected function createElement(string $token, string $content = 'snapshot note'): string

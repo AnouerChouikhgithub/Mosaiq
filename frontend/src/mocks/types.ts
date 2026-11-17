@@ -67,6 +67,11 @@ export interface StickyNote {
   rotation: number
   /** Omitted for demo boards and for notes loaded from the API. */
   saveState?: NoteSaveState
+  /**
+   * Idempotency key of the create operation that produced this note. It is kept
+   * for the whole save/retry lifecycle so a retry is recognised by the server.
+   */
+  mutationId?: string
 }
 
 export interface Connector {

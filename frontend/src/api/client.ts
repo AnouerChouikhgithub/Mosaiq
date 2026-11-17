@@ -234,6 +234,8 @@ export interface ApiCanvasElement {
   content: string | null
   color: string | null
   metadata: Record<string, unknown> | null
+  /** Present when the element was created through an idempotent mutation. */
+  mutationId?: string | null
   author: ApiCanvasAuthor
   createdAt: string
 }
@@ -249,6 +251,8 @@ export interface CanvasElementInput {
   content?: string | null
   color?: string | null
   metadata?: Record<string, unknown> | null
+  /** Idempotency key of this create operation; reuse it on every retry. */
+  mutationId?: string
 }
 
 export type CanvasElementPatch = Partial<
@@ -763,6 +767,7 @@ export function toStickyNote(element: ApiCanvasElement): StickyNote {
     width: element.width,
     height: element.height,
     rotation: element.rotation,
+    mutationId: element.mutationId ?? undefined,
   }
 }
 
