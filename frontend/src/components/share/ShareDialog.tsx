@@ -2,7 +2,7 @@ import { Check, Copy, Link2, Mail, UserPlus, UserMinus } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import type { ShareRole } from '@/mocks'
 import { users, workspace } from '@/mocks'
-import type { ApiUser } from '@/api/client'
+import type { ApiBoardMember } from '@/api/client'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,7 +33,7 @@ export interface ShareDialogProps {
   boardTitle: string
   memberIds: string[]
   boardId: string
-  members: (ApiUser & { boardRole?: string })[]
+  members: ApiBoardMember[]
   publicAccess: boolean
   onInvite: (email: string, role: ShareRole) => Promise<{ token: string; email: string; role: string; expiresAt: string }>
   onRoleChange: (userId: string, role: ShareRole) => Promise<unknown>
@@ -63,7 +63,7 @@ export function ShareDialog({
   const [invites, setInvites] = useState<Invite[]>([])
   const [roles, setRoles] = useState<Record<string, ShareRole>>({})
 
-  const collaborators: (ApiUser & { boardRole?: string })[] = members.length
+  const collaborators: ApiBoardMember[] = members.length
     ? members
     : users.filter((user) => memberIds.includes(user.id)).map((user) => ({ ...user, boardRole: user.role }))
   const shareLink = `${window.location.origin}/share/${encodeURIComponent(boardId)}`

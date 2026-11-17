@@ -6,7 +6,7 @@ const element: ApiCanvasElement = {
   id: 'remote-id', type: 'note', x: 48, y: 96, width: 220, height: 140,
   rotation: 0, content: 'Coordinate test', color: 'sky',
   metadata: { stroke: 'thin', textSize: 'l', align: 'center' },
-  author: { id: 'author', name: 'Test Person', email: 'test@example.test', role: 'Editor', city: 'Tunis', accent: 'cursor-2' },
+  author: { id: 'author', name: 'Test Person', role: 'Editor', accent: 'cursor-2' },
   createdAt: '2026-01-01T00:00:00Z',
 }
 

@@ -53,7 +53,7 @@ export interface ApiCommentMessage {
   id: string
   content: string
   createdAt: string
-  author: ApiUser
+  author: ApiCanvasAuthor
 }
 
 export interface ApiCommentThread {
@@ -188,6 +188,21 @@ export interface ApiUser {
   accent: User['accent']
 }
 
+/**
+ * Board-safe collaborator profile returned by presence, canvas and comment
+ * payloads. Only the member directory keeps the email and city.
+ */
+export interface ApiCanvasAuthor {
+  id: string
+  name: string
+  role: User['role']
+  accent: User['accent']
+}
+
+export interface ApiBoardMember extends ApiUser {
+  boardRole?: string
+}
+
 export type ApiBoardStatus = 'active' | 'archived' | 'trashed'
 
 export interface ApiBoard {
@@ -199,7 +214,7 @@ export interface ApiBoard {
   archivedAt?: string | null
   trashedAt?: string | null
   publicAccess?: boolean
-  members: (ApiUser & { boardRole?: string })[]
+  members: ApiBoardMember[]
   noteColors: string[]
   workspace: { id: string; name: string }
   elementCount: number
@@ -219,7 +234,7 @@ export interface ApiCanvasElement {
   content: string | null
   color: string | null
   metadata: Record<string, unknown> | null
-  author: ApiUser
+  author: ApiCanvasAuthor
   createdAt: string
 }
 
@@ -533,7 +548,7 @@ export async function setBoardLinkAccess(boardId: string, publicAccess: boolean)
 }
 
 export interface ApiPresence {
-  user: ApiUser
+  user: ApiCanvasAuthor
   x: number
   y: number
   tool: string
@@ -668,7 +683,7 @@ const localUserIds = new Map(
   users.map((user) => [user.name.toLowerCase(), user.id]),
 )
 
-function localUserId(apiUser: ApiUser): string {
+function localUserId(apiUser: Pick<ApiUser, 'id' | 'name'>): string {
   return localUserIds.get(apiUser.name.toLowerCase()) ?? apiUser.id
 }
 
@@ -729,7 +744,7 @@ export function toBoard(api: ApiBoard, locale: Locale): Board {
   }
 }
 
-export function toCommentUserId(user: ApiUser): string {
+export function toCommentUserId(user: Pick<ApiUser, 'id' | 'name'>): string {
   return localUserId(user)
 }
 
