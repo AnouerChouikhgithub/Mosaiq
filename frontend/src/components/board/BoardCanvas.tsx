@@ -1,4 +1,4 @@
-import { MousePointer2 } from 'lucide-react'
+import { AlertTriangle, Check, MousePointer2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
@@ -84,6 +84,7 @@ export interface BoardCanvasProps {
   onCreateComment?: (x: number, y: number) => void
   onMoveNote?: (id: string, position: { x: number; y: number }) => void
   onEditNote?: (id: string, text: string) => void
+  onRetryNote?: (id: string) => void
 }
 
 export function BoardCanvas({
@@ -104,6 +105,7 @@ export function BoardCanvas({
   onCreateComment,
   onMoveNote,
   onEditNote,
+  onRetryNote,
 }: BoardCanvasProps) {
   const { t } = useI18n()
   const interactive = Boolean(onSelectNote)
@@ -407,6 +409,44 @@ export function BoardCanvas({
                 <span className="truncate text-[11px] font-medium opacity-70">
                   {author?.name ?? 'Invité'}
                 </span>
+                {note.saveState === 'saving' ? (
+                  <span
+                    role="status"
+                    title={t('canvas.noteSaving')}
+                    className="ml-auto flex shrink-0 items-center"
+                  >
+                    <span
+                      className="size-1.5 animate-pulse rounded-full bg-current opacity-70"
+                      aria-hidden="true"
+                    />
+                    <span className="sr-only">{t('canvas.noteSaving')}</span>
+                  </span>
+                ) : null}
+                {note.saveState === 'saved' ? (
+                  <span
+                    title={t('canvas.noteSaved')}
+                    className="ml-auto flex shrink-0 items-center"
+                  >
+                    <Check className="size-3.5 opacity-70" aria-hidden="true" />
+                    <span className="sr-only">{t('canvas.noteSaved')}</span>
+                  </span>
+                ) : null}
+                {note.saveState === 'failed' ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onRetryNote?.(note.id)
+                    }}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => event.stopPropagation()}
+                    aria-label={t('canvas.noteRetry')}
+                    className="ml-auto flex shrink-0 items-center gap-1 rounded-full bg-danger-soft px-1.5 py-0.5 text-[10px] font-semibold text-danger-text hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  >
+                    <AlertTriangle className="size-3" aria-hidden="true" />
+                    {t('canvas.noteFailed')}
+                  </button>
+                ) : null}
               </div>
             </article>
           )

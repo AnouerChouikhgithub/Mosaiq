@@ -6,6 +6,7 @@ namespace App\Tests\Controller;
 
 use App\Entity\Board;
 use App\Entity\BoardInvitation;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Test\MailerAssertionsTrait;
 
 final class BoardApiControllerTest extends ApiFunctionalTestCase
@@ -36,6 +37,42 @@ final class BoardApiControllerTest extends ApiFunctionalTestCase
         $this->requestAs($this->editorToken, 'PATCH', '/api/boards/'.$this->board->getId(), $payload);
         self::assertResponseIsSuccessful();
         self::assertSame('Renamed', $this->jsonResponse()['title']);
+    }
+
+    public function testBoardUpdatesAcceptJsonObjectBodies(): void
+    {
+        $uri = '/api/boards/'.$this->board->getId();
+
+        $this->requestWithRawBody('PATCH', $uri, '{"title":"test"}', $this->ownerToken);
+        self::assertResponseIsSuccessful();
+        self::assertSame('test', $this->jsonResponse()['title']);
+
+        // Unknown keys stay a no-op, as before the payload validation changed.
+        $this->requestWithRawBody('PATCH', $uri, '{"name":"test"}', $this->ownerToken);
+        self::assertResponseIsSuccessful();
+
+        // An empty object is still a valid JSON object.
+        $this->requestWithRawBody('PATCH', $uri, '{}', $this->ownerToken);
+        self::assertResponseIsSuccessful();
+        self::assertSame('test', $this->jsonResponse()['title']);
+    }
+
+    /** @return iterable<string, array{string, int}> */
+    public static function nonObjectBodies(): iterable
+    {
+        yield 'empty array' => ['[]', 422];
+        yield 'array with a value' => ['["unexpected"]', 422];
+        yield 'string' => ['"text"', 422];
+        yield 'number' => ['123', 422];
+        yield 'null' => ['null', 422];
+        yield 'malformed json' => ['{"title":', 400];
+    }
+
+    #[DataProvider('nonObjectBodies')]
+    public function testBoardUpdatesRejectNonObjectBodies(string $body, int $status): void
+    {
+        $this->requestWithRawBody('PATCH', '/api/boards/'.$this->board->getId(), $body, $this->ownerToken);
+        self::assertResponseStatusCodeSame($status);
     }
 
     public function testCreatingBoardUsesAuthenticatedOwnerAndCannotSelectAnotherWorkspace(): void
@@ -95,7 +132,8 @@ final class BoardApiControllerTest extends ApiFunctionalTestCase
         self::assertArrayNotHasKey('comments', $public);
         self::assertArrayNotHasKey('timeline', $public);
         self::assertSame('Public workshop note', $public['elements'][0]['content']);
-        self::assertSame('', $public['elements'][0]['author']['email']);
+        self::assertArrayNotHasKey('email', $public['elements'][0]['author']);
+        self::assertArrayNotHasKey('city', $public['elements'][0]['author']);
 
         $this->requestAs(null, 'PATCH', '/api/boards/'.$this->board->getId(), ['title' => 'Tampered']);
         self::assertResponseStatusCodeSame(401);

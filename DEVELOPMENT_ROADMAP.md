@@ -115,6 +115,38 @@ Full record: [`docs/sprints/sprint-3-report.md`](docs/sprints/sprint-3-report.md
   with up/down/up of the latest, and dev/test schema validation passes. Backend: 75 tests / 532
   assertions. Frontend: 10 files / 28 tests. PHPStan, CS-Fixer, lint and production build pass.
 
+## Sprint 4 — correctness and security stabilization (2026-11-17)
+
+Full record: [`docs/sprints/sprint-4-report.md`](docs/sprints/sprint-4-report.md).
+
+- **Public canvas lifecycle (security):** the anonymous fallback of
+  `GET /api/boards/{id}/elements` now requires `hasPublicAccess()` **and** `isActive()`, matching
+  `BoardApiController::show()`/`timeline()`. Archived and trashed public boards expose no canvas
+  anonymously; active public boards and authenticated member access are unchanged.
+- **JSON payload contract:** `JsonPayloadTrait` decodes without associative mode and rejects every
+  top-level value that is not a JSON object (`[]`, `["unexpected"]`, `"text"`, `123`, `null` →
+  `422`; malformed → `400`), then normalises objects to an associative array so no caller contract
+  changes.
+- **Canvas/timeline atomicity:** element create, update and delete run inside one
+  `wrapInTransaction` with their timeline snapshot. Validation is hoisted before the transaction
+  because `wrapInTransaction` closes the entity manager when the closure throws.
+  `CanvasTimelineConsistencyTest` proves real rollback: a failing timeline insert leaves zero canvas
+  elements and zero timeline rows.
+- **Note persistence (frontend):** notes carry `saveState` (`saving`/`saved`/`failed`), a failed save
+  shows a retry action that reuses the same local id (no duplicate `POST`), and polling/stream
+  reconciliation goes through `mergeSyncedNotes()` so pending and failed notes survive refresh and
+  persisted notes are not duplicated.
+- **Privacy:** presence, canvas element authors, comment authors, timeline authors and the anonymous
+  public payload use a board-safe `collaborator()` profile (id, name, role, accent); the anonymous
+  payload exposes the display name only. Member-directory profiles keep email/city because the board
+  share dialog and workspace settings already render them for the same audience.
+- **Known limitation:** board create/rename in `BoardApiController` still use two flushes without a
+  shared transaction. They were outside the canvas scope and are documented, not silently changed.
+- Verified at completion: 95 backend tests / 639 assertions; 11 frontend files / 35 tests (serial and
+  parallel); PHPStan, PHP-CS-Fixer (0/67), `composer validate`/`audit`/`check-platform-reqs`,
+  `lint:container`, eight migrations on a fresh isolated database plus schema validation, ESLint and
+  the production build all pass. GitHub Actions status for the branch is recorded in the report.
+
 ## Verified evidence (2026-11-14)
 
 | Check | Result |

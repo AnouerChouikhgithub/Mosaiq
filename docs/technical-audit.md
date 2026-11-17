@@ -797,3 +797,30 @@ files / 28 tests; PHPStan clean; CS-Fixer 0/65; lint and production build pass. 
 - No durable audit or row locking for administrative actions.
 - Workspace Admin access to unjoined private boards remains a broad, explicitly documented policy.
 - No real-browser pass of archive/trash; no green GitHub Actions run (no push).
+
+### 10.2 Sprint 4 corrections (2026-11-17)
+
+Four confirmed defects from the Sprint 3 review were fixed: the anonymous
+`GET /api/boards/{id}/elements` fallback required only `hasPublicAccess()`, so archived and trashed
+public boards still exposed their canvas; `JsonPayloadTrait` accepted JSON arrays and scalars because
+associative decoding maps both arrays and objects to PHP arrays; canvas element CRUD flushed the
+mutation before writing its timeline snapshot; and the editor logged a failed note `POST` while
+leaving the note looking saved.
+
+The fixes are: a public-access fallback that also requires `isActive()`; object-only JSON decoding
+with recursive normalisation; `wrapInTransaction` around each canvas mutation and its snapshot (with
+validation hoisted, since `wrapInTransaction` closes the entity manager on failure); and an explicit
+`saving`/`saved`/`failed` note state with an id-reusing retry and a shared `mergeSyncedNotes()`
+reconciliation for polling and streaming.
+
+The privacy review replaced the full profile in presence, element, comment and timeline payloads
+with a board-safe collaborator profile (`id`, `name`, `role`, `accent`); anonymous public payloads
+expose the display name only. Member-directory payloads keep email and city because the board share
+dialog and workspace settings already render them for the same audience, so no incremental exposure
+was introduced. Board create/rename in `BoardApiController` still use two flushes without a shared
+transaction; that remains a documented limitation.
+
+Final gates: 95 backend tests / 639 assertions; 11 frontend files / 35 tests; PHPStan and CS-Fixer
+(0/67) clean; `composer validate`/`audit`/`check-platform-reqs`, `lint:container`, eight migrations
+on a fresh disposable database with schema validation, ESLint and the production build pass. Full
+evidence is in [`sprints/sprint-4-report.md`](sprints/sprint-4-report.md).

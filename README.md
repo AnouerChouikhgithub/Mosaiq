@@ -241,5 +241,8 @@ AGENTS.md                engineering rules and conventions
   workspace members, roles, invitations, settings and removal policy.
 - [`docs/sprints/sprint-3-report.md`](docs/sprints/sprint-3-report.md) — Sprint 3 board archive,
   trash, restore, lifecycle authorization and dashboard consistency.
+- [`docs/sprints/sprint-4-report.md`](docs/sprints/sprint-4-report.md) — Sprint 4 correctness and
+  security stabilization: public canvas lifecycle, JSON object payloads, canvas/timeline atomicity
+  and note save/retry behavior.
 - [`DEVELOPMENT_ROADMAP.md`](DEVELOPMENT_ROADMAP.md) — phased plan and its verification record.
 - [`AGENTS.md`](AGENTS.md) — contributor and coding-agent conventions.
