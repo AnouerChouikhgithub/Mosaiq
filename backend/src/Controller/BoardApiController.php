@@ -91,9 +91,16 @@ final class BoardApiController extends AbstractController
             if (!$this->isGranted('WORKSPACE_ADMINISTER', $workspace)) {
                 throw new AccessDeniedException('Only workspace administrators can create boards.');
             }
-            $board = $this->boardService->createBoard($workspace, (string) ($payload['title'] ?? ''), array_values($colors), $user);
-            $board->addMember($user, 'Owner');
-            $this->timeline->record($board, $user, sprintf('%s created the board', $user->getName()), 'board');
+            // One transaction: a board without its opening history entry would be
+            // an untracked board, and a failed timeline write must undo it.
+            /** @var Board $board */
+            $board = $this->entityManager->wrapInTransaction(function () use ($workspace, $payload, $colors, $user): Board {
+                $board = $this->boardService->createBoard($workspace, (string) ($payload['title'] ?? ''), array_values($colors), $user);
+                $board->addMember($user, 'Owner');
+                $this->timeline->record($board, $user, sprintf('%s created the board', $user->getName()), 'board');
+
+                return $board;
+            });
         } catch (\JsonException) {
             return $this->json(['error' => 'Malformed JSON payload.'], 400);
         } catch (\InvalidArgumentException $exception) {
@@ -208,13 +215,20 @@ final class BoardApiController extends AbstractController
             $this->denyAccessUnlessGranted('BOARD_EDIT', $board);
             $user = $this->requireUser();
             $payload = $this->decodePayload($request);
-            if (array_key_exists('title', $payload)) {
-                $this->boardService->renameBoard($board, (string) $payload['title']);
-                $this->timeline->record($board, $user, sprintf('%s renamed the board', $user->getName()), 'rename');
-            }
-            if (array_key_exists('starred', $payload)) {
-                $this->boardService->setStarred($board, (bool) $payload['starred']);
-            }
+            // The title and its history entry commit together; the star flag is
+            // part of the same unit so one request never half-applies.
+            $this->entityManager->wrapInTransaction(function () use ($board, $payload, $user): void {
+                if (array_key_exists('title', $payload)) {
+                    if (!is_string($payload['title'])) {
+                        throw new \InvalidArgumentException('Board title must be a string.');
+                    }
+                    $this->boardService->renameBoard($board, $payload['title']);
+                    $this->timeline->record($board, $user, sprintf('%s renamed the board', $user->getName()), 'rename');
+                }
+                if (array_key_exists('starred', $payload)) {
+                    $this->boardService->setStarred($board, (bool) $payload['starred']);
+                }
+            });
         } catch (\JsonException) {
             return $this->json(['error' => 'Malformed JSON payload.'], 400);
         } catch (\InvalidArgumentException $exception) {
