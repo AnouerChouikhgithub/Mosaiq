@@ -67,8 +67,19 @@ final class CanvasApiController extends AbstractController
         try {
             $this->denyAccessUnlessGranted('BOARD_EDIT', $board);
             $actor = $this->actor();
-            $element = $this->boardService->addElement($board, $actor, $this->decodePayload($request));
-            $this->timeline->record($board, $actor, sprintf('%s added a %s', $actor->getName(), $element->getType()), $element->getType());
+            $payload = $this->decodePayload($request);
+            // Validation runs before the transaction so a rejected payload never
+            // leaves an empty transaction behind.
+            $this->boardService->validateElementInput($payload);
+            /** @var CanvasElement $element */
+            $element = $this->entityManager->wrapInTransaction(function () use ($board, $actor, $payload): CanvasElement {
+                // The element and its history entry commit together: a failed
+                // timeline write must not keep an untracked canvas change.
+                $element = $this->boardService->addElement($board, $actor, $payload);
+                $this->timeline->record($board, $actor, sprintf('%s added a %s', $actor->getName(), $element->getType()), $element->getType());
+
+                return $element;
+            });
         } catch (\JsonException) {
             return $this->json(['error' => 'Malformed JSON payload.'], 400);
         } catch (\InvalidArgumentException $exception) {
@@ -106,27 +117,29 @@ final class CanvasApiController extends AbstractController
             if (array_key_exists('color', $payload) && null !== $payload['color'] && !is_string($payload['color'])) {
                 throw new \InvalidArgumentException('Element color must be a string or null.');
             }
-            if ([] !== array_intersect(array_keys($payload), ['x', 'y', 'width', 'height', 'rotation'])) {
-                $element->updateGeometry(
-                    array_key_exists('x', $payload) ? (float) $payload['x'] : $element->getX(),
-                    array_key_exists('y', $payload) ? (float) $payload['y'] : $element->getY(),
-                    array_key_exists('width', $payload) ? (float) $payload['width'] : $element->getWidth(),
-                    array_key_exists('height', $payload) ? (float) $payload['height'] : $element->getHeight(),
-                    array_key_exists('rotation', $payload) ? (float) $payload['rotation'] : $element->getRotation(),
-                );
+            $metadata = array_key_exists('metadata', $payload) ? $payload['metadata'] : $element->getMetadata();
+            if (null !== $metadata && (!is_array($metadata) || array_is_list($metadata))) {
+                throw new \InvalidArgumentException('Element metadata must be an object.');
             }
-            if (array_key_exists('content', $payload)) {
-                $element->updateContent(null === $payload['content'] ? null : (string) $payload['content']);
-            }
-            if (array_key_exists('color', $payload) || array_key_exists('metadata', $payload)) {
-                $metadata = array_key_exists('metadata', $payload) ? $payload['metadata'] : $element->getMetadata();
-                if (null !== $metadata && (!is_array($metadata) || array_is_list($metadata))) {
-                    throw new \InvalidArgumentException('Element metadata must be an object.');
+            $this->entityManager->wrapInTransaction(function () use ($element, $board, $actor, $payload, $metadata): void {
+                if ([] !== array_intersect(array_keys($payload), ['x', 'y', 'width', 'height', 'rotation'])) {
+                    $element->updateGeometry(
+                        array_key_exists('x', $payload) ? (float) $payload['x'] : $element->getX(),
+                        array_key_exists('y', $payload) ? (float) $payload['y'] : $element->getY(),
+                        array_key_exists('width', $payload) ? (float) $payload['width'] : $element->getWidth(),
+                        array_key_exists('height', $payload) ? (float) $payload['height'] : $element->getHeight(),
+                        array_key_exists('rotation', $payload) ? (float) $payload['rotation'] : $element->getRotation(),
+                    );
                 }
-                $element->updateStyle(array_key_exists('color', $payload) && null !== $payload['color'] ? (string) $payload['color'] : $element->getColor(), $metadata);
-            }
-            $this->entityManager->flush();
-            $this->timeline->record($board, $actor, sprintf('%s updated a %s', $actor->getName(), $element->getType()), $element->getType());
+                if (array_key_exists('content', $payload)) {
+                    $element->updateContent(null === $payload['content'] ? null : (string) $payload['content']);
+                }
+                if (array_key_exists('color', $payload) || array_key_exists('metadata', $payload)) {
+                    $element->updateStyle(array_key_exists('color', $payload) && null !== $payload['color'] ? (string) $payload['color'] : $element->getColor(), $metadata);
+                }
+                $this->entityManager->flush();
+                $this->timeline->record($board, $actor, sprintf('%s updated a %s', $actor->getName(), $element->getType()), $element->getType());
+            });
         } catch (\JsonException) {
             return $this->json(['error' => 'Malformed JSON payload.'], 400);
         } catch (\InvalidArgumentException $exception) {
@@ -153,14 +166,16 @@ final class CanvasApiController extends AbstractController
         }
         $actor = $this->actor();
         $type = $element->getType();
-        $snapshot = array_map(
-            fn (CanvasElement $candidate): array => $this->serializer->element($candidate),
-            array_values(array_filter($this->elements->findByBoard($board), static fn (CanvasElement $candidate): bool => $candidate->getId() !== $element->getId())),
-        );
-        $this->entityManager->remove($element);
-        $board->touch();
-        $this->entityManager->flush();
-        $this->timeline->record($board, $actor, sprintf('%s deleted a %s', $actor->getName(), $type), $type, null, $snapshot);
+        $this->entityManager->wrapInTransaction(function () use ($board, $element, $actor, $type): void {
+            $snapshot = array_map(
+                fn (CanvasElement $candidate): array => $this->serializer->element($candidate),
+                array_values(array_filter($this->elements->findByBoard($board), static fn (CanvasElement $candidate): bool => $candidate->getId() !== $element->getId())),
+            );
+            $this->entityManager->remove($element);
+            $board->touch();
+            $this->entityManager->flush();
+            $this->timeline->record($board, $actor, sprintf('%s deleted a %s', $actor->getName(), $type), $type, null, $snapshot);
+        });
 
         return new JsonResponse(null, Response::HTTP_NO_CONTENT);
     }

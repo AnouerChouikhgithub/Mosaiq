@@ -33,9 +33,12 @@ final class BoardService
     }
 
     /**
+     * Validates the canvas payload separately from persistence so a rejected
+     * request fails before the controller opens its transaction.
+     *
      * @param array<string, mixed> $input
      */
-    public function addElement(Board $board, User $author, array $input): CanvasElement
+    public function validateElementInput(array $input): void
     {
         foreach (['type', 'x', 'y', 'width', 'height'] as $required) {
             if (!array_key_exists($required, $input)) {
@@ -60,6 +63,14 @@ final class BoardService
         if (null !== $metadata && (!is_array($metadata) || array_is_list($metadata))) {
             throw new \InvalidArgumentException('Element metadata must be an object.');
         }
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     */
+    public function addElement(Board $board, User $author, array $input): CanvasElement
+    {
+        $this->validateElementInput($input);
 
         $element = new CanvasElement(
             $board,
@@ -72,7 +83,7 @@ final class BoardService
             (float) ($input['rotation'] ?? 0.0),
             isset($input['content']) ? (string) $input['content'] : null,
             isset($input['color']) ? (string) $input['color'] : null,
-            $metadata,
+            $input['metadata'] ?? null,
         );
 
         $this->entityManager->persist($element);
