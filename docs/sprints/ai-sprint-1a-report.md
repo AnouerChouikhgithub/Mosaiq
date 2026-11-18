@@ -224,7 +224,7 @@ composer check-platform-reqs                               → all requirements 
 php bin/console lint:container                             → OK
 APP_ENV=test doctrine:migrations:migrate (fresh database)  → 10 migrations, 80 statements
 APP_ENV=test doctrine:schema:validate                      → mapping correct, schema in sync
-php bin/phpunit (full suite)                               → see the final message / PR
+php bin/phpunit (full suite)                               → OK (201 tests, 1136 assertions)
 ```
 
 ---
