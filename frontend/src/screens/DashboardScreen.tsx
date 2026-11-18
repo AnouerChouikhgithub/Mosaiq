@@ -5,6 +5,7 @@ import {
   MoreHorizontal,
   Plus,
   RotateCcw,
+  Sparkles,
   Star,
   Trash2,
 } from 'lucide-react'
@@ -43,6 +44,9 @@ import {
 import { EmptyState } from '@/components/ui/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/toast-context'
+import { AiBrainstormCard } from '@/features/ai/AiBrainstormCard'
+import { BrainstormingDialog } from '@/features/ai/BrainstormingDialog'
+import { isAiBrainstormingEnabled } from '@/features/ai/config'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import {
@@ -274,6 +278,9 @@ export function DashboardScreen({ onOpenPalette }: { onOpenPalette: () => void }
   const [reloadKey, setReloadKey] = useState(0)
   const [lifecycleTarget, setLifecycleTarget] = useState<{ board: Board; action: LifecycleAction } | null>(null)
   const [lifecyclePending, setLifecyclePending] = useState(false)
+  // Feature flag: false hides every AI entry point without touching the rest.
+  const [aiOpen, setAiOpen] = useState(false)
+  const aiEnabled = isAiBrainstormingEnabled()
 
   const requestedView = searchParams.get('view')
   const view: WorkspaceView =
@@ -458,10 +465,23 @@ export function DashboardScreen({ onOpenPalette }: { onOpenPalette: () => void }
       onOpenPalette={onOpenPalette}
       actions={
         view === 'boards' ? (
-          <Button type="button" onClick={() => createBoard()}>
-            <Plus className="size-4" aria-hidden="true" />
-            {t('dashboard.newBoard')}
-          </Button>
+          <div className="flex items-center gap-2">
+            {aiEnabled ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setAiOpen(true)}
+                aria-label={t('ai.entry.short')}
+              >
+                <Sparkles className="size-4" aria-hidden="true" />
+                <span className="hidden sm:inline">{t('ai.entry.short')}</span>
+              </Button>
+            ) : null}
+            <Button type="button" onClick={() => createBoard()}>
+              <Plus className="size-4" aria-hidden="true" />
+              {t('dashboard.newBoard')}
+            </Button>
+          </div>
         ) : null
       }
     >
@@ -526,6 +546,7 @@ export function DashboardScreen({ onOpenPalette }: { onOpenPalette: () => void }
               </Link>
             </div>
             <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {aiEnabled ? <AiBrainstormCard onStart={() => setAiOpen(true)} /> : null}
               {templates.map((template) => (
                 <TemplateCard
                   key={template.id}
@@ -540,6 +561,7 @@ export function DashboardScreen({ onOpenPalette }: { onOpenPalette: () => void }
 
       {view === 'templates' ? (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {aiEnabled ? <AiBrainstormCard onStart={() => setAiOpen(true)} /> : null}
           {templates.map((template) => (
             <TemplateCard
               key={template.id}
@@ -583,6 +605,10 @@ export function DashboardScreen({ onOpenPalette }: { onOpenPalette: () => void }
         ) : (
           renderGrid(visibleBoards, view)
         )
+      ) : null}
+
+      {aiEnabled && aiOpen ? (
+        <BrainstormingDialog open onOpenChange={setAiOpen} />
       ) : null}
 
       <Dialog

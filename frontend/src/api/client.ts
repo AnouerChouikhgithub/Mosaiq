@@ -12,7 +12,8 @@ import type {
 import { users } from '@/mocks'
 import type { Locale } from '@/i18n'
 
-const API_BASE_URL = (
+/** Shared base URL; the dedicated AI client reuses it so both stay in sync. */
+export const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
 ).replace(/\/$/, '')
 
