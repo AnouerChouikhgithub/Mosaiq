@@ -14,7 +14,7 @@
 | --- | --- |
 | Branch | `test/ai-brainstorming-release` (created from `aed5f97`) |
 | `origin/main` | `01aed5e` — *does not contain the AI feature* |
-| Commits on this branch | see `git log --oneline origin/main..test/ai-brainstorming-release` |
+| Commits on this branch | `273d7d4` test(ai) — tests + validator hardening; `6cd1e27` docs(ai) — documentation and this report; plus the docs-only commit that fills in §16 (no code after the CI run) |
 | Push | pushed to `origin`; PR opened against `main` (link in §16) |
 | `main` | untouched; nothing merged, nothing force-pushed |
 
@@ -188,7 +188,7 @@ hiding every entry point while normal board creation keeps working**.
 | Run | Branch | Result |
 | --- | --- | --- |
 | [44141113308](https://github.com/AnouerChouikhgithub/Mosaiq/actions/runs/44141113308) | `main` | **success** (2m09s, 2026-11-17) — the last green `main` run |
-| This branch | `test/ai-brainstorming-release` | recorded in §16 |
+| [44319153923](https://github.com/AnouerChouikhgithub/Mosaiq/actions/runs/44319153923) | `test/ai-brainstorming-release` (PR #5) | **success** (1m48s) — Backend pass 1m45s, Frontend pass 47s. The first CI execution the AI code has ever had |
 
 **Finding (P2, structural):** `.github/workflows/ci.yml` triggers only on pushes to `main` and pull
 requests targeting `main`. The AI integration lived on feature branches, so **no CI run had ever
@@ -319,7 +319,7 @@ Release criteria, honestly scored:
 
 | Criterion | Status |
 | --- | --- |
-| All required CI checks pass | **Pending** the PR run in §16; local parity is green |
+| All required CI checks pass | **Verified** — run `44319153923` on PR #5: both jobs green (§8) |
 | AI generation works with the configured provider | **Not verified** — no provider access; the client, adapter, retry, timeout and validation paths are covered, the live call is not |
 | Proposal validation works | **Verified** (218 backend tests) |
 | Preview editing works | **Verified** (jsdom) |
@@ -335,4 +335,10 @@ and (b) one two-browser pass of §10.
 
 ## 16. PR link and CI status
 
-_Pending: this section is completed by the follow-up commit after the PR run finishes._
+- **PR:** [#5](https://github.com/AnouerChouikhgithub/Mosaiq/pull/5) — `test/ai-brainstorming-release` → `main`. **Not merged** (merging is out of scope for this sprint).
+- **CI run:** [`44319153923`](https://github.com/AnouerChouikhgithub/Mosaiq/actions/runs/44319153923) — **success** in 1m48s on 2026-11-18T13:58:07Z.
+  - Backend job: **pass**, 1m45s — install, validate, audit, platform reqs, container lint, migrations on a fresh PostgreSQL 16 service, schema validate, PHPStan, CS-Fixer, PHPUnit.
+  - Frontend job: **pass**, 47s — `pnpm install --frozen-lockfile`, lint, build, Vitest.
+- This is the **first time the AI integration has been executed by CI**. The Sprint 2 report's green CI referred to a `main` run that predates the AI work (§8).
+- The only commit after the run above is the docs-only commit that fills in this section; no code, test, workflow or configuration changed after the validated run.
+- CI runs on PHP 8.3 with PostgreSQL 16, so the run also confirms the feature on the declared runtime floor, not only on this machine's PHP 8.5.
