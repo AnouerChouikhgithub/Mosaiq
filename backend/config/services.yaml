@@ -30,6 +30,28 @@ services:
         arguments:
             $tokenTtl: '%app.auth_token_ttl%'
 
+    # AI brainstorming generation (docs/architecture/AI_BRAINSTORMING_CONTRACT.md).
+    # The single provider of this release is selected through the interface, so a
+    # second provider is a new class plus configuration, not a controller change.
+    App\Ai\Brainstorming\BrainstormingProviderInterface:
+        alias: App\Ai\Brainstorming\Provider\OpenAiCompatibleBrainstormingProvider
+
+    App\Ai\Brainstorming\Provider\OpenAiCompatibleBrainstormingProvider:
+        arguments:
+            $enabled: '%env(bool:AI_ENABLED)%'
+            $providerSlug: '%env(string:AI_PROVIDER)%'
+            $baseUrl: '%env(string:AI_BASE_URL)%'
+            $model: '%env(string:AI_MODEL)%'
+            $apiKey: '%env(string:AI_PROVIDER_API_KEY)%'
+            $timeoutSeconds: '%env(int:AI_TIMEOUT_SECONDS)%'
+
+    # Quota is enforced per user and per deployment; see contract §6.8.
+    App\Ai\AiGenerationRateLimiter:
+        arguments:
+            $perTenMinutes: '%env(int:AI_RATE_LIMIT_PER_10_MINUTES)%'
+            $perHour: '%env(int:AI_RATE_LIMIT_PER_HOUR)%'
+            $globalPerMinute: '%env(int:AI_RATE_LIMIT_GLOBAL_PER_MINUTE)%'
+
     App\Security\AuthThrottle:
         arguments:
             $enabled: '%env(bool:AUTH_THROTTLE_ENABLED)%'

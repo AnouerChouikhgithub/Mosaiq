@@ -206,6 +206,7 @@ backend/                 Symfony 7.4 API (PHP >= 8.3)
   src/Repository/        typed repositories and access-scoped queries
   src/Security/          bearer authenticator + board/workspace voters
   src/Service/           board/canvas serializers, timeline, mailer
+  src/Ai/                AI brainstorming domain: provider adapter, prompt, validation, quota
   src/DataFixtures/      idempotent synthetic catalog and guarded loader
   migrations/            PostgreSQL schema migrations
   tests/                 PHPUnit functional, fixture and safety tests
@@ -229,6 +230,14 @@ AGENTS.md                engineering rules and conventions
 
 ## Documentation
 
+- [`backend/README.md`](backend/README.md) — backend setup, environment variables, AI provider
+  configuration, endpoint/error examples and rate limits.
+- [`docs/architecture/AI_BRAINSTORMING_CONTRACT.md`](docs/architecture/AI_BRAINSTORMING_CONTRACT.md)
+  — AI brainstorming contract v1.0: schema, limits, API and security rules.
+- [`docs/architecture/adr/ADR-001-ai-generation-isolated-from-persistence.md`](docs/architecture/adr/ADR-001-ai-generation-isolated-from-persistence.md)
+  — why generation is isolated from board persistence.
+- [`docs/sprints/ai-sprint-1a-report.md`](docs/sprints/ai-sprint-1a-report.md) — backend generation
+  implementation, provider choice and evidence.
 - [`docs/ui-spec.md`](docs/ui-spec.md) — design system, screens and states.
 - [`docs/technical-audit.md`](docs/technical-audit.md) — audit findings and the dependency
   approval proposal.

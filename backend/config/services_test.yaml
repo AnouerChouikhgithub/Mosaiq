@@ -1,0 +1,6 @@
+# Test-only overrides. The AI interface resolves to a scripted fake so the suite
+# is deterministic and never reaches a provider, and CI needs no API key.
+services:
+    App\Tests\Support\FakeBrainstormingProvider: ~
+
+    App\Ai\Brainstorming\BrainstormingProviderInterface: '@App\Tests\Support\FakeBrainstormingProvider'
