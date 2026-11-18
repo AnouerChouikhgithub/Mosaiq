@@ -35,6 +35,47 @@ session and redirects to `/sign-in?expired=1`; login/registration 401s remain cr
 Screens keep working with the typed data in `src/mocks/` when the API is unreachable, and log a
 single warning through `warnFallback`; that fallback is demo behaviour, not persistence.
 
+## AI brainstorming (Sprint 1B)
+
+The first AI feature turns a natural-language prompt into a structured brainstorming proposal,
+which the user reviews and edits before anything can be persisted. Sprint 1B ships the
+generation and preview experience only: there is **no** apply/save action yet, so no board,
+element or timeline row is ever written by this screen.
+
+Entry points (dashboard): the *Brainstorm with AI* button in the header and the *Assisted
+brainstorming* card in the board-creation/template grid. Both open
+`src/features/ai/BrainstormingDialog.tsx`.
+
+| Component | Responsibility |
+| --- | --- |
+| `src/features/ai/BrainstormingDialog.tsx` | Form, validation, consent notice, generating/error/cancelled states |
+| `src/features/ai/BrainstormingPreview.tsx` | Editable proposal preview (title, objective, sections, notes, types, reordering) |
+| `src/features/ai/useBrainstormingGeneration.ts` | One-request-at-a-time state machine with cancel and retry |
+| `src/features/ai/proposalDraft.ts` | Pure reducer for preview edits and contract caps |
+| `src/features/ai/validation.ts` | Form and preview validation from the shared limits |
+| `src/features/ai/errors.ts` | Contract error codes → translated states |
+| `src/features/ai/limits.ts` | `AI_BRAINSTORMING_LIMITS`, note-type colours, §7.3 layout |
+| `src/api/aiBrainstorming.ts` | Dedicated client, 35 s timeout, response shape guard, mock switch |
+
+The wire types mirror `docs/architecture/AI_BRAINSTORMING_CONTRACT.md` v1.0. Do not change them
+without changing that document first.
+
+### Configuration
+
+```dotenv
+# Hide every AI entry point (default: on)
+VITE_AI_BRAINSTORMING_ENABLED=false
+
+# Call the real Sprint 1A endpoint instead of the mock (default: true, i.e. mocked)
+VITE_AI_BRAINSTORMING_MOCK=false
+```
+
+Sprint 1A runs in parallel, so `generateBrainstormingProposal` returns a contract-shaped
+**mocked** response by default (`src/features/ai/mockResponse.ts`) and the preview displays a
+*Simulated response* badge. Set `VITE_AI_BRAINSTORMING_MOCK=false` to send
+`POST /api/ai/brainstorming/generate` through `fetchBrainstormingProposal`; no other file
+changes. The mock is latency-simulated, abortable and contains no provider call or credential.
+
 ## Structure
 
 ```
@@ -49,6 +90,7 @@ src/
     ui/         reusable primitives (button, input, dialog, toast, …)
   i18n/         FR/EN/AR dictionaries, provider, RTL handling
   mocks/        typed Tunisian sample data
+  features/ai/  generation form, preview editor, limits, validation, mock
   screens/      sign-in, dashboard, editor, time travel, public board, settings
   tests/        Vitest suites
   theme/        CSS tokens + theme context/provider
@@ -64,6 +106,10 @@ src/
   semantics. There is no Yjs/Hocuspocus CRDT or offline merge.
 * The "E2E" suite is a jsdom integration test with a mocked API; there is no real-browser
   Playwright suite yet.
+* AI brainstorming ends at the editable preview: applying a proposal to a new or existing board
+  is Sprint 2 work, and the backend endpoint is mocked unless `VITE_AI_BRAINSTORMING_MOCK=false`.
+  Responsive and RTL coverage is jsdom assertions on layout classes and `dir`, not a real-browser
+  or automated accessibility audit.
 
 Design rules and conventions live in [`../AGENTS.md`](../AGENTS.md); the audit and repair record
 is in [`../docs/technical-audit.md`](../docs/technical-audit.md) and
