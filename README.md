@@ -25,6 +25,7 @@ Brand color: `#6D4AFF` (light) / `#8B73FF` (dark), used as the single primary co
 | Board create/list/rename/star, canvas notes, comments, sharing, invitations, replay/restore | **IMPLEMENTED** | Symfony JSON API + typed client; tests cover the contract |
 | Workspace settings, members and invitations | **IMPLEMENTED** | Persisted roles, removal, hashed invitations, name settings and owner/admin policy (Sprint 2) |
 | Board archive and trash | **IMPLEMENTED** | Persisted active/archived/trashed states, restore and status-filtered dashboard views (Sprint 3) |
+| AI brainstorming (generate → review → import) | **IMPLEMENTED, opt-in** | `POST /api/ai/brainstorming/generate` returns a server-validated proposal; the dashboard reviews and edits it locally; approval imports it through the normal board and idempotent element endpoints. Fail-closed behind `AI_ENABLED` |
 | Browser navigation and history | **IMPLEMENTED** | React Router, route guards, `Ctrl K` palette |
 | Presence and canvas updates | **PARTIALLY IMPLEMENTED** | Short authenticated SSE frames + 500 ms reconnect + 3 s poll are verified; CRDT/offline merge is **PLANNED** and semantics are last-write-wins |
 | Shape / connector / text / pen / image tools | **PARTIALLY IMPLEMENTED** | Connectors and frames render from stored data; creating with the five tools is **PLANNED** |
@@ -36,7 +37,7 @@ Brand color: `#6D4AFF` (light) / `#8B73FF` (dark), used as the single primary co
 | CSP / HttpOnly cookie session | **PLANNED** | Tokens remain in `sessionStorage`; expiry is the current mitigation |
 | Playwright real-browser E2E | **PLANNED** | A jsdom scenario test with a mocked API exists; it is not a browser test |
 | Permanent board deletion / trash retention | **PLANNED** | Trash is recoverable indefinitely; no retention or purge policy is approved |
-| GitHub Actions CI | **NOT VERIFIED** | Run `43715665395` passed the frontend and failed the backend at `composer install` (lock required PHP 8.4). The lock is fixed for PHP 8.3 and CI now creates the `_test`-suffixed database; a re-run is pending a push |
+| GitHub Actions CI | **PASSING on `main`** | Run [`44141113308`](https://github.com/AnouerChouikhgithub/Mosaiq/actions/runs/44141113308) (`main`, 2026-11-17, 2m09s) passed both jobs. The AI release branch's own run is recorded in [`docs/sprints/ai-sprint-3-report.md`](docs/sprints/ai-sprint-3-report.md) |
 
 ## Highlights
 
@@ -117,6 +118,41 @@ digit.
 
 Mailpit UI: <http://localhost:8025>.
 
+## AI brainstorming
+
+A dashboard card and header button open a dialog that turns a topic, an objective and optional
+context into a structured proposal (title, objective, up to 5 sections, up to 25 notes). The user
+reviews and edits it — title, objective, section titles, note content and note type, add/remove
+sections and notes — and only pressing *Create the board* writes anything. Generation itself
+persists nothing and accepts no board or workspace identifier, so it cannot touch existing content.
+
+Approval creates an ordinary board through `POST /api/boards` plus one idempotent
+`POST /api/boards/{id}/elements` per note, using the same authorization, timeline and collaboration
+path as a manually created board. Imported notes carry `metadata.aiSectionId`, `aiSectionTitle` and
+`aiNoteType`; the preview's placement is the deterministic layout in
+`frontend/src/features/ai/layout.ts`.
+
+AI is **off by default and fails closed**. Enable it in `backend/.env.local` (never commit a key):
+
+```dotenv
+AI_ENABLED=1
+AI_PROVIDER=openai-compatible
+AI_BASE_URL=https://api.your-provider.example/v1   # without /chat/completions
+AI_MODEL=your-model-id
+AI_PROVIDER_API_KEY=...                           # secret store in production
+```
+
+`AI_TIMEOUT_SECONDS`, `AI_RATE_LIMIT_PER_10_MINUTES`, `AI_RATE_LIMIT_PER_HOUR` and
+`AI_RATE_LIMIT_GLOBAL_PER_MINUTE` tune the budgets. Until `AI_ENABLED=1` and the key/base URL/model
+are set, the endpoint answers `503 ai.provider_unavailable` and the dialog says *AI is not
+configured*. The browser can also hide the feature entirely with `VITE_AI_BRAINSTORMING_ENABLED=false`.
+
+Privacy: only the user's topic, objective, context, language and detail level leave the server, and
+they go to the operator-configured provider — external processing, not a Mosaiq-internal model. Logs
+record identifiers, counts and durations, never the prompt, the proposal or the key. The API contract,
+error codes and limits are documented in [`backend/README.md`](backend/README.md) and
+[`docs/architecture/AI_BRAINSTORMING_CONTRACT.md`](docs/architecture/AI_BRAINSTORMING_CONTRACT.md).
+
 ## Quality checks
 
 Run from the repository root unless a `cd` is shown:
@@ -192,6 +228,11 @@ redirect in a real browser, Mailpit's web UI, and performance/accessibility audi
 - `AUTH_THROTTLE_ENABLED=1` plus `AUTH_LOGIN_MAX_ATTEMPTS`, `AUTH_LOGIN_IP_MAX_ATTEMPTS`,
   `AUTH_LOGIN_WINDOW_SECONDS`, `AUTH_REGISTER_MAX_ATTEMPTS` and `AUTH_REGISTER_WINDOW_SECONDS`.
 - `SYMFONY_TRUSTED_PROXIES` when a reverse proxy terminates TLS; otherwise per-IP limits are ineffective.
+- AI is optional: leave `AI_ENABLED=0` to keep every AI route failing closed with `503`. To enable it,
+  set `AI_ENABLED=1`, `AI_PROVIDER=openai-compatible`, `AI_BASE_URL`, `AI_MODEL` and
+  `AI_PROVIDER_API_KEY` through the secret store, tune the three `AI_RATE_LIMIT_*` values, and run the
+  `ai_generation_usage` migration before switching it on. Keep `VITE_AI_BRAINSTORMING_ENABLED=false`
+  in the frontend build when AI must be hidden from users.
 - The frontend and API share an origin, or the API is reverse-proxied under the same origin; the
   development CORS allowlist is loopback-only and is not a production CORS policy.
 - Existing tokens are invalid after the Sprint 1 migration (their expiry is null); users must sign
@@ -253,5 +294,7 @@ AGENTS.md                engineering rules and conventions
 - [`docs/sprints/sprint-4-report.md`](docs/sprints/sprint-4-report.md) — Sprint 4 correctness and
   security stabilization: public canvas lifecycle, JSON object payloads, canvas/timeline atomicity
   and note save/retry behavior.
+- [`docs/sprints/ai-sprint-3-report.md`](docs/sprints/ai-sprint-3-report.md) — AI release readiness:
+  security/privacy review, output-quality assessment, CI evidence and remaining findings.
 - [`DEVELOPMENT_ROADMAP.md`](DEVELOPMENT_ROADMAP.md) — phased plan and its verification record.
 - [`AGENTS.md`](AGENTS.md) — contributor and coding-agent conventions.

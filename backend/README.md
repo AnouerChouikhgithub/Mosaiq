@@ -150,6 +150,16 @@ Every error keeps the existing `error` field and adds a stable `code`:
 }
 ```
 
+### Output validation
+
+Model output is untrusted data and never persisted. The validator caps the document at 64 KiB,
+requires one JSON object with a `proposal` object, refuses a `relationships` field (schema 1.0 has
+no connector contract), normalises unknown `type`/`category` values to `idea`/`ideas`, clamps and
+trims text, drops empty notes, empty sections and repeated notes — **including across sections** —
+and caps the result to 5 sections and 25 notes. Anything structurally unusable becomes
+`502 ai.provider_failed`; anything repairable is reported through `truncated`. Section ids and note
+ids are assigned by the validator, so a model cannot supply a duplicate or a foreign id.
+
 ### Rate limits and cost protection
 
 - 5 requests per 10 minutes and 20 per hour per authenticated user, plus 60 per minute for the whole
@@ -173,6 +183,11 @@ provider slug, error code, prompt **length**, section/note counts and duration �
 the proposal or the key. Provider error bodies and stack traces are never returned to clients.
 
 Nothing is persisted by generation, so there is no server-side generation history in this release.
+
+## AI release verification
+
+The AI feature's security review, output-quality assessment, migration checks and remaining findings
+are recorded in [`../docs/sprints/ai-sprint-3-report.md`](../docs/sprints/ai-sprint-3-report.md).
 
 ## Tests
 
