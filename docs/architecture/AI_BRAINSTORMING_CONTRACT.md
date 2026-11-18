@@ -1,6 +1,6 @@
 # AI brainstorming contract — v1.0
 
-**Status:** proposal for implementation (contract only; nothing in this document is implemented)
+**Status:** implemented in Sprint 1A/1B; §7.2, §7.3 and §7.6 revised by the Sprint 2 integration
 **Contract version:** `1.0` — carried on every response as `schemaVersion`
 **Audience:** Sprint 1A (backend AI generation) and Sprint 1B (frontend AI experience)
 **Owner:** the two workstreams jointly; changes follow §12
@@ -16,6 +16,13 @@ Both teams implement against this document. Where this document and an implement
 this document wins until §12 changes it.
 
 Normative language: **MUST**, **MUST NOT**, **SHOULD** and **MAY** are used in their RFC 2119 sense.
+
+### Revision log
+
+| Date | Sprint | Change |
+| --- | --- | --- |
+| 2026-11-18 | 1A/1B | First implementation of v1.0: endpoint, provider pipeline, preview. |
+| 2026-11-18 | 2 | §7.3 layout replaced (the original formula placed notes outside the 1400×880 canvas), §7.6 partial failure replaced by a compensating rollback, §7.2 adds section metadata. Wire shape, request fields, limits and `schemaVersion` are unchanged, so this is **not** a schema bump. |
 
 ---
 
@@ -447,7 +454,14 @@ POST /api/boards/{boardId}/elements
   "rotation": 0,
   "content": "<note.content>",
   "color": "<mapped color>",
-  "metadata": { "stroke": "none", "textSize": "m", "align": "left", "aiNoteType": "idea" }
+  "metadata": {
+    "stroke": "none",
+    "textSize": "m",
+    "align": "left",
+    "aiNoteType": "idea",
+    "aiSectionId": "s1",
+    "aiSectionTitle": "Publics prioritaires"
+  }
 }
 ```
 
@@ -459,34 +473,50 @@ Rules:
   with the returned element, exactly like the manual note flow.
 - A `409` means the key was reused with a different payload or the insert lost a race; the client
   retries with the **same** key once, then shows the failure state.
-- `color` follows the note type (§7.4). `metadata.aiNoteType` is additive: the API stores metadata
-  as-is, the serializer returns it, and the frontend ignores keys it does not know.
+- `color` follows the note type (§7.4). `metadata` is additive: the API stores it as-is, the
+  serializer returns it, and the frontend ignores keys it does not know.
 - Notes keep their semantic type only in `metadata.aiNoteType`; it MUST NOT change what the canvas
-  renders.
+  renders. `aiSectionId`/`aiSectionTitle` carry the section the note came from, because v1 has no
+  text element and section headings are not persisted; they are display-only metadata for later
+  clients and never affect layout or authorization.
 
 ### 7.3 Deterministic layout
 
-Both the preview and the board use this formula so an approved proposal lands exactly where the user
-saw it. All values are CSS pixels in canvas coordinates.
+**Revised in Sprint 2.** The original formula (one column per section, `x = 80 + s * 268`,
+`y = 160 + n * 164`) placed the tenth note of a section at `y ≈ 1636` on the real 1400×880 canvas,
+so it could not satisfy §5's leading requirement that nothing is created outside the usable area.
+The replacement is a pure function of the note counts, implemented once in
+`frontend/src/features/ai/layout.ts` and asserted by both the frontend layout tests and the backend
+import test.
+
+Safe area (inset so shadows and the editor frame are not clipped): `x 80‥1320`, `y 160‥840`
+(1240 × 680), top-left origin, integer CSS pixels.
 
 ```
-NOTE_WIDTH  = 220
-NOTE_HEIGHT = 140
-COLUMN_GAP  = 48
-ROW_GAP     = 24
-ORIGIN_X    = 80
-ORIGIN_Y    = 160
+NOTE_WIDTH_MAX  = 220      NOTE_HEIGHT_MAX = 140
+NOTE_MIN_WIDTH  = 140      NOTE_MIN_HEIGHT = 72
+COLUMN_GAP      = 20       ROW_GAP         = 16      SECTION_GAP = 32
 
-x = ORIGIN_X + sectionIndex * (NOTE_WIDTH + COLUMN_GAP)
-y = ORIGIN_Y + noteIndexInSection * (NOTE_HEIGHT + ROW_GAP)
+columns      = clamp(ceil(sqrt(totalNotes)), 1, 5)
+rows         = sum over sections of ceil(sectionNotes / columns)
+noteHeight   = min(140, floor((680 - bandGaps - sectionGaps) / rows))
+noteWidth    = min(220, floor((1240 - (columns-1) * 20) / columns))
+x(note)      = blockLeft + columnInBand * (noteWidth + 20)
+y(note)      = bandTop   + rowInBand    * (noteHeight + 16)
 ```
 
-- Sections are ordered as returned; notes keep their order inside a section.
-- No note is placed at negative coordinates, so nothing is clipped by the top-left origin.
-- Section **titles are not persisted** in v1: there is no text element type (`TYPES` is
-  `note, shape, connector, frame`) and the editor does not render server-provided frames. The
-  preview shows section groups; the board shows grouped note columns.
+- Each section starts a new band, so sections are separated vertically by `SECTION_GAP`; notes keep
+  their order inside a section and wrap after `columns`.
+- The whole block is centred in the safe area. Notes are never at negative coordinates and never
+  extend past `x = 1320` / `y = 840`, for every proposal the limits allow (≤ 5 sections, ≤ 25 notes).
+- The worst allowed shape (25 notes skewed across 5 sections) still yields notes of at least
+  140 × 72, which the tests assert; normal proposals keep the 220 × 140 note.
+- Section **titles are not persisted** as elements in v1: there is no text element type (`TYPES` is
+  `note, shape, connector, frame`) and the editor does not render server-provided frames. They travel
+  in note metadata (§7.2) and the board shows grouped note bands.
 - Rotation stays `0`; the apply path never rotates generated notes.
+- The editor's default zoom (0.8) and top-left origin show the whole 1400×880 board, so an imported
+  proposal is visible immediately without panning.
 
 ### 7.4 Note type → color
 
@@ -510,14 +540,27 @@ The mapping lives beside the limits on both sides and MUST NOT be extended beyon
 - Other clients see the notes through the existing SSE invalidation frame and the 3 s poll. No new
   broadcast, no new stream event, no socket.
 
-### 7.6 Partial failure
+### 7.6 Failure and rollback
 
-- Notes are independent. A failure at note 7 of 12 leaves notes 1–6 stored; the client MUST keep the
-  remaining notes visible with the existing `failed` save state and per-note retry.
-- There is no bulk rollback and no compensating delete: deleting notes would itself be a new
-  behaviour, and permanent board deletion (and retention) is **PLANNED**.
-- If the board creation fails, nothing is persisted and the proposal stays available for a retry.
-- The preview MUST warn that applying writes immediately to the board; the user approves the whole
+**Revised in Sprint 2.** Sprint 1B left partial failure undefined beyond "keep the failed note". The
+approved integration behaviour is all-or-nothing **from the user's point of view**, built only from
+existing endpoints:
+
+- The board is created first (`POST /api/boards`, one server transaction). If it fails, nothing is
+  persisted and the proposal stays editable for another attempt.
+- Each note is one idempotent create, retried **once with the same `mutationId`** for transport
+  errors, `5xx` and `409`. The server replays a stored element, so a retry cannot duplicate a note.
+- A `4xx` (permission change, invalid payload, expired session) is final and not retried.
+- If any note still fails, the client **compensates**: it deletes the notes this import created
+  (newest first) and trashes the board. The result is an empty trashed board, never a partial active
+  board that collaborators would see. The UI then reports the failure and keeps the proposal.
+- The client MUST NOT show a success message before every note has been persisted, and MUST NOT
+  navigate to the board before that point.
+- Notes and the board still have no cross-request transaction; there is no bulk endpoint and no
+  permanent board deletion (PLANNED). A compensating rollback is therefore best-effort: if the
+  deletes or the trash call itself fail, the board may remain with some notes, but it is reported as
+  a failure rather than as a success.
+- The preview MUST warn that approval writes immediately to the board; the user approves the whole
   proposal, not individual requests.
 
 ### 7.7 What MUST NOT be introduced

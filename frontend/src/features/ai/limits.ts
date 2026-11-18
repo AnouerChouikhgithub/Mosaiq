@@ -77,22 +77,15 @@ export const AI_NOTE_TYPE_COLORS: Record<AiNoteType, NoteColor> = {
   action: 'lilac',
 }
 
-/**
- * §7.3 — deterministic layout shared by the preview and, from Sprint 2, the
- * apply path. Kept here so the board cannot drift from what the user reviewed.
- */
-export const AI_NOTE_LAYOUT = {
-  noteWidth: 220,
-  noteHeight: 140,
-  columnGap: 48,
-  rowGap: 24,
-  originX: 80,
-  originY: 160,
-} as const
+/** The five palette tokens a generated board accepts (contract §7.1). */
+export const AI_BOARD_NOTE_COLORS: readonly NoteColor[] = [
+  'amber',
+  'rose',
+  'sky',
+  'mint',
+  'lilac',
+] as const
 
-export function aiNotePosition(sectionIndex: number, noteIndex: number) {
-  return {
-    x: AI_NOTE_LAYOUT.originX + sectionIndex * (AI_NOTE_LAYOUT.noteWidth + AI_NOTE_LAYOUT.columnGap),
-    y: AI_NOTE_LAYOUT.originY + noteIndex * (AI_NOTE_LAYOUT.noteHeight + AI_NOTE_LAYOUT.rowGap),
-  }
-}
+// Placement lives in `./layout.ts`: the contract §7.3 formula did not fit the
+// real 1400×880 canvas, so the fitting algorithm is the single owner of
+// coordinates for both the review and the import path.

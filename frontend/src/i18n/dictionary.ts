@@ -484,7 +484,6 @@ export const fr = {
   'ai.preview.title': 'Vérifier la proposition',
   'ai.preview.description':
     'Modifiez librement le contenu. Cet aperçu n’est pas un tableau et rien n’est enregistré.',
-  'ai.preview.mockBadge': 'Réponse simulée',
   'ai.preview.localBadge': 'Aperçu local — non enregistré',
   'ai.preview.truncated':
     'La proposition a été réduite pour respecter les limites du contrat.',
@@ -509,7 +508,25 @@ export const fr = {
   'ai.preview.editRequest': 'Modifier la demande',
   'ai.preview.summary': '{sections} sections · {notes} notes',
   'ai.preview.footerHint':
-    'L’enregistrement du tableau sera branché à l’intégration Sprint 2.',
+    'Créer le tableau écrit immédiatement les notes. Les collaborateurs les verront comme des notes manuelles.',
+  'ai.preview.createBoard': 'Créer le tableau',
+  'ai.preview.adminOnly':
+    'Seul un administrateur de l’espace de travail peut créer un tableau. Vous pouvez générer et modifier des propositions, mais pas les importer.',
+  'ai.import.pending':
+    'Création du tableau et des notes en cours. Ne fermez pas cette fenêtre.',
+  'ai.import.progress': 'Création… {done}/{total} notes',
+  'ai.import.success': '« {title} » a été créé',
+  'ai.import.successBody': '{count} notes ont été ajoutées au tableau.',
+  'ai.import.errorTitle': 'Import impossible',
+  'ai.import.invalidBody':
+    'La proposition modifiée ne respecte plus les limites. Corrigez-la puis réessayez.',
+  'ai.import.forbiddenBody':
+    'Vos droits ont changé : la création du tableau est réservée aux administrateurs de l’espace de travail.',
+  'ai.import.unauthorizedBody': 'Votre session a expiré. Reconnectez-vous puis réessayez.',
+  'ai.import.networkBody':
+    'Le serveur n’a pas répondu. Aucun tableau partiel n’a été conservé ; réessayez.',
+  'ai.import.failedBody':
+    'L’import a échoué et a été annulé : les notes créées ont été supprimées et le tableau placé dans la corbeille.',
   'ai.preview.limitsTitle': 'Limites dépassées',
   'ai.preview.limitsBody':
     'Certaines valeurs dépassent le contrat. Ajustez-les avant de continuer.',
@@ -998,7 +1015,6 @@ export const en: Record<TranslationKey, string> = {
   'ai.preview.title': 'Review the proposal',
   'ai.preview.description':
     'Edit anything you like. This is a preview, not a board, and nothing is saved.',
-  'ai.preview.mockBadge': 'Simulated response',
   'ai.preview.localBadge': 'Local preview — not saved',
   'ai.preview.truncated':
     'The proposal was trimmed to fit the contract limits.',
@@ -1023,7 +1039,25 @@ export const en: Record<TranslationKey, string> = {
   'ai.preview.editRequest': 'Edit the request',
   'ai.preview.summary': '{sections} sections · {notes} notes',
   'ai.preview.footerHint':
-    'Saving the board is wired up during the Sprint 2 integration.',
+    'Creating the board writes the notes immediately. Collaborators see them as ordinary notes.',
+  'ai.preview.createBoard': 'Create the board',
+  'ai.preview.adminOnly':
+    'Only a workspace administrator can create a board. You can generate and edit proposals, but not import them.',
+  'ai.import.pending':
+    'Creating the board and its notes. Do not close this window.',
+  'ai.import.progress': 'Creating… {done}/{total} notes',
+  'ai.import.success': '“{title}” was created',
+  'ai.import.successBody': '{count} notes were added to the board.',
+  'ai.import.errorTitle': 'Import failed',
+  'ai.import.invalidBody':
+    'The edited proposal no longer meets the limits. Fix it and try again.',
+  'ai.import.forbiddenBody':
+    'Your permissions changed: only workspace administrators can create the board.',
+  'ai.import.unauthorizedBody': 'Your session expired. Sign in again and retry.',
+  'ai.import.networkBody':
+    'The server did not answer. No partial board was kept; try again.',
+  'ai.import.failedBody':
+    'The import failed and was rolled back: the notes it created were deleted and the board was moved to the trash.',
   'ai.preview.limitsTitle': 'Limits exceeded',
   'ai.preview.limitsBody':
     'Some values exceed the contract. Adjust them before continuing.',
@@ -1503,7 +1537,6 @@ export const ar: Record<TranslationKey, string> = {
   'ai.preview.title': 'راجع المقترح',
   'ai.preview.description':
     'عدّل المحتوى بحرية. هذه معاينة وليست لوحة، ولا يُحفظ شيء.',
-  'ai.preview.mockBadge': 'استجابة محاكاة',
   'ai.preview.localBadge': 'معاينة محلية — غير محفوظة',
   'ai.preview.truncated': 'تم تقليص المقترح لاحترام حدود العقد.',
   'ai.preview.boardTitle': 'عنوان اللوحة',
@@ -1527,7 +1560,24 @@ export const ar: Record<TranslationKey, string> = {
   'ai.preview.editRequest': 'تعديل الطلب',
   'ai.preview.summary': '{sections} أقسام · {notes} ملاحظات',
   'ai.preview.footerHint':
-    'سيُربط حفظ اللوحة عند تكامل Sprint 2.',
+    'إنشاء اللوحة يكتب الملاحظات فورًا. سيراها المتعاونون كملاحظات عادية.',
+  'ai.preview.createBoard': 'إنشاء اللوحة',
+  'ai.preview.adminOnly':
+    'إنشاء اللوحة متاح لمسؤول مساحة العمل فقط. يمكنك إنشاء المقترحات وتعديلها دون استيرادها.',
+  'ai.import.pending': 'جارٍ إنشاء اللوحة والملاحظات. لا تغلق هذه النافذة.',
+  'ai.import.progress': 'جارٍ الإنشاء… {done}/{total} ملاحظة',
+  'ai.import.success': 'تم إنشاء «{title}»',
+  'ai.import.successBody': 'أُضيفت {count} ملاحظة إلى اللوحة.',
+  'ai.import.errorTitle': 'تعذّر الاستيراد',
+  'ai.import.invalidBody':
+    'المقترح المعدّل لا يحقق الحدود. صحّحه ثم أعد المحاولة.',
+  'ai.import.forbiddenBody':
+    'تغيّرت صلاحياتك: إنشاء اللوحة متاح لمسؤول مساحة العمل فقط.',
+  'ai.import.unauthorizedBody': 'انتهت الجلسة. سجّل الدخول من جديد ثم أعد المحاولة.',
+  'ai.import.networkBody':
+    'لم يستجب الخادم. لم تُحفظ أي لوحة جزئية؛ أعد المحاولة.',
+  'ai.import.failedBody':
+    'فشل الاستيراد وتم التراجع عنه: حُذفت الملاحظات المنشأة ونُقلت اللوحة إلى المهملات.',
   'ai.preview.limitsTitle': 'تجاوز الحدود',
   'ai.preview.limitsBody':
     'بعض القيم تتجاوز العقد. عدّلها قبل المتابعة.',

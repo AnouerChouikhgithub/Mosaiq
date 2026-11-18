@@ -18,36 +18,100 @@ vi.mock('@/api/client', async (importOriginal) => {
 })
 
 import { BrainstormingDialog } from '@/features/ai/BrainstormingDialog'
-import { buildMockProposal } from '@/features/ai/mockResponse'
 import { AiGenerationError } from '@/features/ai/errors'
 import { toWireRequest } from '@/api/aiBrainstorming'
 import { DashboardScreen } from '@/screens/DashboardScreen'
 import { I18nProvider } from '@/i18n'
 import { ThemeProvider } from '@/theme/ThemeProvider'
 import { ToastProvider } from '@/components/ui/toast'
-import type { AiBrainstormingRequest, AiBrainstormingResponse } from '@/features/ai/types'
+import type {
+  AiBrainstormingRequest,
+  AiBrainstormingResponse,
+  AiLanguage,
+  AiNoteType,
+  AiSectionCategory,
+} from '@/features/ai/types'
+
+/** Deterministic contract-shaped response: 4 sections × 3 notes. */
+const fixtureSections: Record<
+  AiLanguage,
+  { title: string; category: AiSectionCategory }[]
+> = {
+  en: [
+    { title: 'Session goals', category: 'goals' },
+    { title: 'Who is involved', category: 'audience' },
+    { title: 'Options to explore', category: 'ideas' },
+    { title: 'Risks and blockers', category: 'risks' },
+  ],
+  fr: [
+    { title: 'Objectifs de la session', category: 'goals' },
+    { title: 'Publics concernés', category: 'audience' },
+    { title: 'Pistes à explorer', category: 'ideas' },
+    { title: 'Risques et freins', category: 'risks' },
+  ],
+  ar: [
+    { title: 'أهداف الجلسة', category: 'goals' },
+    { title: 'الجهات المعنية', category: 'audience' },
+    { title: 'مسارات للاستكشاف', category: 'ideas' },
+    { title: 'المخاطر والعوائق', category: 'risks' },
+  ],
+}
+
+const fixtureFirstNote: Record<AiLanguage, (topic: string) => string> = {
+  en: (topic) => `State ${topic} in one shared sentence`,
+  fr: (topic) => `Clarifier ${topic} en une phrase partagée`,
+  ar: (topic) => `توضيح ${topic} في جملة مشتركة`,
+}
+
+const fixtureNoteTypes: AiNoteType[] = ['idea', 'question', 'challenge']
 
 function fixture(
   overrides: Partial<AiBrainstormingRequest> = {},
 ): AiBrainstormingResponse {
-  return buildMockProposal(
-    toWireRequest({
-      topic: 'Shared bikes in Tunis',
-      objective: 'Pick three pilot districts',
-      context: '',
-      language: 'en',
-      detailLevel: 'balanced',
-      ...overrides,
-    }),
-  )
+  const request = toWireRequest({
+    topic: 'Shared bikes in Tunis',
+    objective: 'Pick three pilot districts',
+    context: '',
+    language: 'en',
+    detailLevel: 'balanced',
+    ...overrides,
+  })
+
+  return {
+    schemaVersion: '1.0',
+    language: request.language,
+    detailLevel: request.detailLevel,
+    truncated: false,
+    proposal: {
+      title: request.topic,
+      objective: request.objective,
+      sections: fixtureSections[request.language].map((section, sectionIndex) => ({
+        id: `s${sectionIndex + 1}`,
+        title: section.title,
+        category: section.category,
+        notes: fixtureNoteTypes.map((type, noteIndex) => ({
+          id: `s${sectionIndex + 1}-n${noteIndex + 1}`,
+          type,
+          content:
+            sectionIndex === 0 && noteIndex === 0
+              ? fixtureFirstNote[request.language](request.topic)
+              : `${section.title} note ${noteIndex + 1}`,
+        })),
+      })),
+    },
+  }
 }
 
 function renderDialog() {
   const onOpenChange = vi.fn()
   const view = render(
-    <I18nProvider>
-      <BrainstormingDialog open onOpenChange={onOpenChange} />
-    </I18nProvider>,
+    <MemoryRouter>
+      <I18nProvider>
+        <ToastProvider>
+          <BrainstormingDialog open onOpenChange={onOpenChange} />
+        </ToastProvider>
+      </I18nProvider>
+    </MemoryRouter>,
   )
   return { ...view, onOpenChange }
 }
@@ -266,9 +330,9 @@ describe('AI brainstorming dialog', () => {
       screen.getByDisplayValue('State Shared bikes in Tunis in one shared sentence'),
     ).toBeTruthy()
     expect(screen.getByText('Local preview — not saved')).toBeTruthy()
-    // Nothing is persisted and no board endpoint is called.
+    // The approval action exists, but rendering the preview writes nothing.
+    expect(screen.getByRole('button', { name: 'Create the board' })).toBeTruthy()
     expect(fetchSpy).not.toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: /create the board/i })).toBeNull()
     fetchSpy.mockRestore()
   })
 
@@ -422,7 +486,9 @@ describe('AI brainstorming preview', () => {
     const { fetchSpy } = await openPreview()
 
     expect(
-      screen.getByText('Saving the board is wired up during the Sprint 2 integration.'),
+      screen.getByText(
+        'Creating the board writes the notes immediately. Collaborators see them as ordinary notes.',
+      ),
     ).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
     expect(screen.queryByText('En direct')).toBeNull()

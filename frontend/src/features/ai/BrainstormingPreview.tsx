@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Input, NativeSelect, Textarea } from '@/components/ui/input'
 import { useI18n, type TranslationKey } from '@/i18n'
 import { cn } from '@/lib/utils'
-import { readAiBrainstormingFlags } from './config'
 import {
   AI_BRAINSTORMING_LIMITS,
   AI_NOTE_TYPES,
@@ -16,6 +15,7 @@ import {
   draftFromResponse,
   proposalDraftReducer,
   totalDraftNotes,
+  type ProposalDraft,
 } from './proposalDraft'
 import { validateProposalDraft } from './validation'
 import type { AiBrainstormingResponse, AiNoteType, AiSectionCategory } from './types'
@@ -39,6 +39,11 @@ const categoryLabelKeys: Record<AiSectionCategory, TranslationKey> = {
 
 export interface BrainstormingPreviewProps {
   response: AiBrainstormingResponse
+  /** New boards need workspace administration rights (contract §7.1). */
+  canCreateBoard: boolean
+  /** Non-null while the approved draft is being persisted. */
+  importing: { completed: number; total: number } | null
+  onApprove: (draft: ProposalDraft) => void
   onEditRequest: () => void
   onDiscard: () => void
 }
@@ -47,12 +52,15 @@ export interface BrainstormingPreviewProps {
  * The proposal preview editor.
  *
  * It is deliberately not the board editor: the draft is local state, there is no
- * canvas, no timeline and no save call. Sprint 2 adds the apply path on top of
- * this component; until then "discard" is the only outcome, which is exactly
- * what contract §8.5 requires.
+ * canvas and no save call until the user presses "Create the board". That action
+ * hands the draft to the import path, which re-validates it and uses the normal
+ * board and element endpoints (§7, §8.5).
  */
 export function BrainstormingPreview({
   response,
+  canCreateBoard,
+  importing,
+  onApprove,
   onEditRequest,
   onDiscard,
 }: BrainstormingPreviewProps) {
@@ -65,7 +73,7 @@ export function BrainstormingPreview({
   )
   const issues = useMemo(() => validateProposalDraft(draft), [draft])
   const totalNotes = totalDraftNotes(draft)
-  const useMock = readAiBrainstormingFlags().useMock
+  const approveBlocked = !canCreateBoard || issues.length > 0
 
   return (
     <section aria-labelledby="ai-preview-heading" className="flex flex-col gap-5">
@@ -74,7 +82,6 @@ export function BrainstormingPreview({
           {t('ai.preview.title')}
         </h3>
         <Badge variant="primary">{t('ai.preview.localBadge')}</Badge>
-        {useMock ? <Badge variant="outline">{t('ai.preview.mockBadge')}</Badge> : null}
         <span className="ms-auto text-caption text-muted-foreground">
           {t('ai.preview.summary', {
             sections: draft.sections.length,
@@ -379,16 +386,62 @@ export function BrainstormingPreview({
         </div>
       ) : null}
 
+      {!canCreateBoard ? (
+        <p
+          role="status"
+          className="rounded-card border border-border bg-muted/50 px-3 py-2 text-caption text-muted-foreground"
+        >
+          {t('ai.preview.adminOnly')}
+        </p>
+      ) : null}
+
+      {importing ? (
+        <p
+          role="status"
+          aria-live="polite"
+          className="rounded-card border border-border bg-muted/50 px-3 py-2 text-caption text-foreground"
+        >
+          {t('ai.import.pending')}
+        </p>
+      ) : null}
+
       <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-caption text-muted-foreground">
           {t('ai.preview.footerHint')}
         </p>
         <div className="flex flex-col-reverse gap-2 sm:flex-row">
-          <Button type="button" variant="secondary" onClick={onEditRequest}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onEditRequest}
+            disabled={importing !== null}
+          >
             {t('ai.preview.editRequest')}
           </Button>
-          <Button type="button" variant="primary" onClick={onDiscard}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onDiscard}
+            disabled={importing !== null}
+          >
             {t('ai.preview.discard')}
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            loading={importing !== null}
+            disabled={approveBlocked}
+            title={
+              approveBlocked && canCreateBoard ? t('ai.preview.limitsTitle') : undefined
+            }
+            onClick={() => onApprove(draft)}
+          >
+            {importing
+              ? t('ai.import.progress', {
+                  done: importing.completed,
+                  total: importing.total,
+                })
+              : t('ai.preview.createBoard')}
           </Button>
         </div>
       </div>

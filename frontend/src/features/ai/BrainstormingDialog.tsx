@@ -1,5 +1,6 @@
 import { AlertTriangle, Loader2, ShieldCheck, Sparkles } from 'lucide-react'
 import { useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Dialog,
   DialogContent,
@@ -9,6 +10,8 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Field, Input, NativeSelect, Textarea } from '@/components/ui/input'
+import { useToast } from '@/components/ui/toast-context'
+import { getSessionUser, getSessionWorkspace } from '@/api/client'
 import { useI18n, type TranslationKey } from '@/i18n'
 import { cn } from '@/lib/utils'
 import {
@@ -25,6 +28,12 @@ import {
 } from './limits'
 import { useBrainstormingGeneration } from './useBrainstormingGeneration'
 import { countCharacters, validateAiForm, type AiFormErrors } from './validation'
+import {
+  importProposal,
+  ProposalImportError,
+  type ProposalImportErrorKind,
+} from './importProposal'
+import { totalDraftNotes, type ProposalDraft } from './proposalDraft'
 import { toWireRequest } from '@/api/aiBrainstorming'
 import type {
   AiBrainstormingFormValues,
@@ -80,6 +89,34 @@ const errorCopy: Record<AiErrorKind, { title: TranslationKey; body: TranslationK
     title: 'ai.state.cancelledTitle',
     body: 'ai.state.cancelledBody',
   },
+}
+
+const importErrorBodies: Record<ProposalImportErrorKind, TranslationKey> = {
+  invalid: 'ai.import.invalidBody',
+  forbidden: 'ai.import.forbiddenBody',
+  unauthorized: 'ai.import.unauthorizedBody',
+  network: 'ai.import.networkBody',
+  failed: 'ai.import.failedBody',
+}
+
+/** Only workspace administrators may create the board (contract §7.1). */
+function canCreateBoards(): boolean {
+  const role = getSessionUser()?.role
+  return role === 'Owner' || role === 'Admin'
+}
+
+interface ImportState {
+  status: 'idle' | 'importing' | 'error'
+  completed: number
+  total: number
+  error: ProposalImportError | null
+}
+
+const idleImport: ImportState = {
+  status: 'idle',
+  completed: 0,
+  total: 0,
+  error: null,
 }
 
 function createInitialValues(locale: AiLanguage): AiBrainstormingFormValues {
@@ -144,6 +181,8 @@ export interface BrainstormingDialogProps {
  */
 export function BrainstormingDialog({ open, onOpenChange }: BrainstormingDialogProps) {
   const { t, locale } = useI18n()
+  const { toast } = useToast()
+  const navigate = useNavigate()
   const limits = AI_BRAINSTORMING_LIMITS
   const topicRef = useRef<HTMLInputElement>(null)
   const [values, setValues] = useState<AiBrainstormingFormValues>(() =>
@@ -152,20 +191,60 @@ export function BrainstormingDialog({ open, onOpenChange }: BrainstormingDialogP
   const [errors, setErrors] = useState<AiFormErrors>({})
   const [consent, setConsent] = useState(hasAcceptedAiNotice)
   const [consentError, setConsentError] = useState(false)
+  const [importState, setImportState] = useState<ImportState>(idleImport)
+  // A ref, not state: two clicks in the same tick must not both start an import.
+  const importingRef = useRef(false)
   const { state, generate, cancel, retry, reset } = useBrainstormingGeneration()
 
   const generating = state.status === 'generating'
   const showPreview = state.status === 'success' && state.response !== null
+  const importing = importState.status === 'importing'
 
   // The dashboard mounts this dialog per opening, so the initial values always
   // start from the current interface language (contract §3: no implicit
   // default, the client sends its locale).
 
   function close() {
+    // Closing mid-import would hide a board that is being written.
+    if (importingRef.current) return
     reset()
     setErrors({})
     setConsentError(false)
+    setImportState(idleImport)
     onOpenChange(false)
+  }
+
+  /**
+   * Approval: the only place that writes anything (§8.5). The draft is
+   * re-validated inside the import path; success is reported only after every
+   * note has been persisted, and the user lands on the real board.
+   */
+  async function approve(draft: ProposalDraft) {
+    if (importingRef.current) return
+    importingRef.current = true
+    setImportState({ status: 'importing', completed: 0, total: totalDraftNotes(draft), error: null })
+
+    try {
+      const result = await importProposal(draft, {
+        workspaceId: getSessionWorkspace()?.id,
+        onProgress: ({ completed, total }) =>
+          setImportState({ status: 'importing', completed, total, error: null }),
+      })
+      toast({
+        title: t('ai.import.success', { title: draft.title.trim() }),
+        description: t('ai.import.successBody', { count: result.noteCount }),
+      })
+      importingRef.current = false
+      onOpenChange(false)
+      navigate(`/board/${result.boardId}`)
+    } catch (error) {
+      const importError =
+        error instanceof ProposalImportError
+          ? error
+          : new ProposalImportError('failed', 'The import failed.', { cause: error })
+      setImportState({ status: 'error', completed: 0, total: 0, error: importError })
+      importingRef.current = false
+    }
   }
 
   function updateField(field: 'topic' | 'objective' | 'context', value: string) {
@@ -217,12 +296,28 @@ export function BrainstormingDialog({ open, onOpenChange }: BrainstormingDialogP
         </DialogHeader>
 
         {showPreview && state.response ? (
-          <div className="px-4 pb-6 sm:px-6">
+          <div className="flex flex-col gap-4 px-4 pb-6 sm:px-6">
             <BrainstormingPreview
               response={state.response}
+              canCreateBoard={canCreateBoards()}
+              importing={
+                importing
+                  ? { completed: importState.completed, total: importState.total }
+                  : null
+              }
+              onApprove={(draft) => void approve(draft)}
               onEditRequest={reset}
               onDiscard={close}
             />
+            {importState.status === 'error' && importState.error ? (
+              <StatusPanel
+                role="alert"
+                tone="danger"
+                icon={<AlertTriangle className="size-4" aria-hidden="true" />}
+                title={t('ai.import.errorTitle')}
+                body={t(importErrorBodies[importState.error.kind])}
+              />
+            ) : null}
           </div>
         ) : (
           <form

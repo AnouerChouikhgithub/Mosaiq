@@ -1,9 +1,7 @@
 import { API_BASE_URL, getSessionToken } from '@/api/client'
-import { readAiBrainstormingFlags } from '@/features/ai/config'
 import { AiGenerationError, mapAiErrorResponse } from '@/features/ai/errors'
 import { AI_BRAINSTORMING_LIMITS } from '@/features/ai/limits'
 import { normalizePromptText } from '@/features/ai/validation'
-import { generateMockProposal } from '@/features/ai/mockResponse'
 import {
   AI_SCHEMA_VERSION,
   type AiBrainstormingFormValues,
@@ -24,10 +22,8 @@ import {
  * existing conventions, and the real endpoint is the only network dependency —
  * there is no second persistence path here.
  *
- * While Sprint 1A is being built in parallel, `generateBrainstormingProposal`
- * routes to a mocked contract-shaped response. Flip
- * `VITE_AI_BRAINSTORMING_MOCK=false` to call the real endpoint; nothing else in
- * the UI changes.
+ * Sprint 2 removed the Sprint 1B mock: generation always calls the endpoint and
+ * the tests mock `fetch`/this module instead of shipping a fake transport.
  */
 
 const AI_GENERATE_PATH = '/ai/brainstorming/generate'
@@ -213,16 +209,10 @@ export async function fetchBrainstormingProposal(
   }
 }
 
-/**
- * The single entry point the UI uses. In Sprint 1B it is mocked by default; the
- * real transport sits beside it and is selected by `VITE_AI_BRAINSTORMING_MOCK`.
- */
+/** The single entry point the UI uses: always the real Mosaiq endpoint. */
 export function generateBrainstormingProposal(
   request: AiBrainstormingRequest,
   options: AiRequestOptions = {},
 ): Promise<AiBrainstormingResponse> {
-  if (readAiBrainstormingFlags().useMock) {
-    return generateMockProposal(request, options)
-  }
   return fetchBrainstormingProposal(request, options)
 }
