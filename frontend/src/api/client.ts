@@ -12,7 +12,8 @@ import type {
 import { users } from '@/mocks'
 import type { Locale } from '@/i18n'
 
-const API_BASE_URL = (
+/** Shared base URL; the dedicated AI client reuses it so both stay in sync. */
+export const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api'
 ).replace(/\/$/, '')
 
@@ -459,6 +460,7 @@ export async function restoreBoardLifecycle(id: string): Promise<ApiBoard> {
 export async function createBoard(
   title: string,
   workspaceId?: string,
+  noteColors?: NoteColor[],
 ): Promise<ApiBoard> {
   const targetWorkspace =
     workspaceId ?? (await getWorkspaces())[0]?.id
@@ -469,7 +471,11 @@ export async function createBoard(
 
   return request<ApiBoard>('/boards', {
     method: 'POST',
-    body: JSON.stringify({ title, workspaceId: targetWorkspace }),
+    body: JSON.stringify({
+      title,
+      workspaceId: targetWorkspace,
+      ...(noteColors && noteColors.length > 0 ? { noteColors } : {}),
+    }),
   })
 }
 

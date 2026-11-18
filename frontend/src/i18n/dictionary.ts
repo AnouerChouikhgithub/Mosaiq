@@ -397,6 +397,162 @@ export const fr = {
   'publicBoard.unavailableDescription': 'Le lien est incorrect ou l’accès public a été désactivé.',
   'publicBoard.readOnly': 'Lecture seule (Accès public)',
   'publicBoard.signInToEdit': 'Se connecter pour modifier',
+
+  'ai.entry.short': 'Brainstormer avec l’IA',
+  'ai.entry.title': 'Brainstorming assisté',
+  'ai.entry.description':
+    'Décrivez un sujet et obtenez un tableau structuré à relire.',
+  'ai.entry.action': 'Générer une proposition',
+  'ai.entry.badge': 'IA',
+  'ai.dialog.title': 'Générer un brainstorming',
+  'ai.dialog.description':
+    'Un aperçu éditable d’abord. Rien n’est enregistré avant votre décision.',
+  'ai.form.topic': 'Sujet',
+  'ai.form.topicPlaceholder': 'Lancer une flotte de vélos partagés à Tunis',
+  'ai.form.topicHint': 'De 3 à 280 caractères. Un sujet précis aide le modèle.',
+  'ai.form.objective': 'Objectif',
+  'ai.form.objectivePlaceholder':
+    'Identifier les quartiers, le budget et les risques',
+  'ai.form.objectiveHint': 'De 5 à 500 caractères. Une phrase suffit.',
+  'ai.form.context': 'Contexte (facultatif)',
+  'ai.form.contextPlaceholder': 'Contraintes, publics, échéances…',
+  'ai.form.contextHint':
+    'Jusqu’à 2000 caractères. N’ajoutez pas de données personnelles.',
+  'ai.form.language': 'Langue du contenu',
+  'ai.form.detail': 'Niveau de détail',
+  'ai.form.detail.concise': 'Concis',
+  'ai.form.detail.balanced': 'Équilibré',
+  'ai.form.detail.detailed': 'Détaillé',
+  'ai.form.budget.concise': 'Jusqu’à 9 notes',
+  'ai.form.budget.balanced': 'Jusqu’à 15 notes',
+  'ai.form.budget.detailed': 'Jusqu’à 25 notes',
+  'ai.form.counter': '{count}/{max} caractères',
+  'ai.form.required': 'Ce champ est obligatoire.',
+  'ai.form.topicTooShort':
+    'Le sujet doit contenir au moins {min} caractères.',
+  'ai.form.topicTooLong':
+    'Le sujet ne peut pas dépasser {max} caractères.',
+  'ai.form.objectiveTooShort':
+    'L’objectif doit contenir au moins {min} caractères.',
+  'ai.form.objectiveTooLong':
+    'L’objectif ne peut pas dépasser {max} caractères.',
+  'ai.form.contextTooLong':
+    'Le contexte ne peut pas dépasser {max} caractères.',
+  'ai.form.submit': 'Générer la proposition',
+  'ai.form.privacyTitle':
+    'Vos textes partent vers un fournisseur d’IA externe',
+  'ai.form.privacyBody':
+    'Le sujet, l’objectif et le contexte sont envoyés au fournisseur. Aucune autre donnée du tableau n’est transmise et la proposition n’est pas enregistrée.',
+  'ai.form.privacyAccept': 'J’ai compris',
+  'ai.form.privacyRequired': 'Confirmez la notice avant de générer.',
+  'ai.form.privacySession':
+    'La notice réapparaît à chaque nouvelle session.',
+  'ai.state.generating': 'Génération en cours…',
+  'ai.state.generatingBody':
+    'Le fournisseur compose les sections et les notes. Vous pouvez annuler à tout moment.',
+  'ai.state.cancel': 'Annuler la génération',
+  'ai.state.cancelledTitle': 'Génération annulée',
+  'ai.state.cancelledBody':
+    'Aucune proposition n’a été enregistrée. Vous pouvez relancer la même demande.',
+  'ai.state.retry': 'Réessayer',
+  'ai.state.back': 'Modifier la demande',
+  'ai.error.invalidTitle': 'Demande incomplète',
+  'ai.error.invalidBody':
+    'Corrigez les champs signalés puis relancez la génération.',
+  'ai.error.networkTitle': 'Réseau indisponible',
+  'ai.error.networkBody':
+    'Impossible de joindre Mosaiq. Vérifiez votre connexion puis réessayez.',
+  'ai.error.timeoutTitle': 'La génération a pris trop de temps',
+  'ai.error.timeoutBody':
+    'Le fournisseur n’a pas répondu en 35 secondes. Réessayez dans un instant.',
+  'ai.error.rateTitle': 'Trop de demandes',
+  'ai.error.rateBody': 'Réessayez dans {seconds} secondes.',
+  'ai.error.rateBodyFallback': 'Patientez quelques minutes avant de relancer.',
+  'ai.error.providerTitle': 'Le fournisseur a échoué',
+  'ai.error.providerBody':
+    'La proposition reçue était inutilisable. Réessayez ou ajustez le sujet.',
+  'ai.error.unavailableTitle': 'IA non configurée',
+  'ai.error.unavailableBody':
+    'La génération n’est pas activée sur ce serveur. Contactez l’administrateur.',
+  'ai.error.sessionTitle': 'Session expirée',
+  'ai.error.sessionBody': 'Reconnectez-vous pour générer une proposition.',
+  'ai.error.workspaceTitle': 'Espace de travail inactif',
+  'ai.error.workspaceBody':
+    'Votre compte n’a plus accès à cet espace de travail.',
+  'ai.error.internalTitle': 'Erreur inattendue',
+  'ai.error.internalBody': 'La génération a échoué. Réessayez dans un instant.',
+  'ai.preview.title': 'Vérifier la proposition',
+  'ai.preview.description':
+    'Modifiez librement le contenu. Cet aperçu n’est pas un tableau et rien n’est enregistré.',
+  'ai.preview.localBadge': 'Aperçu local — non enregistré',
+  'ai.preview.truncated':
+    'La proposition a été réduite pour respecter les limites du contrat.',
+  'ai.preview.boardTitle': 'Titre du tableau',
+  'ai.preview.objective': 'Objectif',
+  'ai.preview.sections': 'Sections',
+  'ai.preview.sectionTitle': 'Titre de la section',
+  'ai.preview.sectionAria': 'Section {index} : {title}',
+  'ai.preview.moveUp': 'Monter la section',
+  'ai.preview.moveDown': 'Descendre la section',
+  'ai.preview.removeSectionAria': 'Supprimer la section {title}',
+  'ai.preview.addSection': 'Ajouter une section',
+  'ai.preview.addNote': 'Ajouter une note',
+  'ai.preview.removeNoteAria': 'Supprimer la note {index}',
+  'ai.preview.noteType': 'Type de note',
+  'ai.preview.noteContent': 'Contenu de la note',
+  'ai.preview.notesCount': '{count}/{max} notes',
+  'ai.preview.totalNotes': '{count}/{max} notes au total',
+  'ai.preview.sectionsCount': '{count}/{max} sections',
+  'ai.preview.emptySection': 'Aucune note dans cette section.',
+  'ai.preview.discard': 'Fermer sans enregistrer',
+  'ai.preview.editRequest': 'Modifier la demande',
+  'ai.preview.summary': '{sections} sections · {notes} notes',
+  'ai.preview.footerHint':
+    'Créer le tableau écrit immédiatement les notes. Les collaborateurs les verront comme des notes manuelles.',
+  'ai.preview.createBoard': 'Créer le tableau',
+  'ai.preview.adminOnly':
+    'Seul un administrateur de l’espace de travail peut créer un tableau. Vous pouvez générer et modifier des propositions, mais pas les importer.',
+  'ai.import.pending':
+    'Création du tableau et des notes en cours. Ne fermez pas cette fenêtre.',
+  'ai.import.progress': 'Création… {done}/{total} notes',
+  'ai.import.success': '« {title} » a été créé',
+  'ai.import.successBody': '{count} notes ont été ajoutées au tableau.',
+  'ai.import.errorTitle': 'Import impossible',
+  'ai.import.invalidBody':
+    'La proposition modifiée ne respecte plus les limites. Corrigez-la puis réessayez.',
+  'ai.import.forbiddenBody':
+    'Vos droits ont changé : la création du tableau est réservée aux administrateurs de l’espace de travail.',
+  'ai.import.unauthorizedBody': 'Votre session a expiré. Reconnectez-vous puis réessayez.',
+  'ai.import.networkBody':
+    'Le serveur n’a pas répondu. Aucun tableau partiel n’a été conservé ; réessayez.',
+  'ai.import.failedBody':
+    'L’import a échoué et a été annulé : les notes créées ont été supprimées et le tableau placé dans la corbeille.',
+  'ai.preview.limitsTitle': 'Limites dépassées',
+  'ai.preview.limitsBody':
+    'Certaines valeurs dépassent le contrat. Ajustez-les avant de continuer.',
+  'ai.limit.sectionCount': 'De {min} à {max} sections.',
+  'ai.limit.totalNotes': 'Maximum {max} notes.',
+  'ai.limit.fewNotes': 'Au moins {min} notes sont nécessaires.',
+  'ai.limit.titleLength': 'Le titre doit contenir de {min} à {max} caractères.',
+  'ai.limit.objectiveLength':
+    'L’objectif doit contenir de {min} à {max} caractères.',
+  'ai.limit.sectionTitleLength':
+    'Le titre de section doit contenir de {min} à {max} caractères.',
+  'ai.limit.noteContentLength':
+    'Une note doit contenir de {min} à {max} caractères.',
+  'ai.limit.sectionNotes': 'Maximum {max} notes par section.',
+  'ai.limit.maxReached': 'Limite atteinte',
+  'ai.noteType.idea': 'Idée',
+  'ai.noteType.question': 'Question',
+  'ai.noteType.challenge': 'Défi',
+  'ai.noteType.opportunity': 'Opportunité',
+  'ai.noteType.action': 'Action',
+  'ai.category.goals': 'Objectifs',
+  'ai.category.audience': 'Publics',
+  'ai.category.ideas': 'Idées',
+  'ai.category.risks': 'Risques',
+  'ai.category.actions': 'Actions',
+  'ai.category.questions': 'Questions',
 } as const
 
 export type TranslationKey = keyof typeof fr
@@ -777,6 +933,157 @@ export const en: Record<TranslationKey, string> = {
   'publicBoard.unavailableDescription': 'The link is invalid or public access has been turned off.',
   'publicBoard.readOnly': 'Read-only (public access)',
   'publicBoard.signInToEdit': 'Sign in to edit',
+
+  'ai.entry.short': 'Brainstorm with AI',
+  'ai.entry.title': 'Assisted brainstorming',
+  'ai.entry.description':
+    'Describe a topic and get a structured board to review.',
+  'ai.entry.action': 'Generate a proposal',
+  'ai.entry.badge': 'AI',
+  'ai.dialog.title': 'Generate a brainstorming board',
+  'ai.dialog.description':
+    'You review an editable preview first. Nothing is saved before you decide.',
+  'ai.form.topic': 'Topic',
+  'ai.form.topicPlaceholder': 'Launch a shared bike fleet in Tunis',
+  'ai.form.topicHint': '3 to 280 characters. A specific topic helps the model.',
+  'ai.form.objective': 'Objective',
+  'ai.form.objectivePlaceholder':
+    'Identify the first districts, the budget and the risks',
+  'ai.form.objectiveHint': '5 to 500 characters. One sentence is enough.',
+  'ai.form.context': 'Context (optional)',
+  'ai.form.contextPlaceholder': 'Constraints, audiences, deadlines…',
+  'ai.form.contextHint':
+    'Up to 2000 characters. Do not paste personal data.',
+  'ai.form.language': 'Content language',
+  'ai.form.detail': 'Detail level',
+  'ai.form.detail.concise': 'Concise',
+  'ai.form.detail.balanced': 'Balanced',
+  'ai.form.detail.detailed': 'Detailed',
+  'ai.form.budget.concise': 'Up to 9 notes',
+  'ai.form.budget.balanced': 'Up to 15 notes',
+  'ai.form.budget.detailed': 'Up to 25 notes',
+  'ai.form.counter': '{count}/{max} characters',
+  'ai.form.required': 'This field is required.',
+  'ai.form.topicTooShort': 'The topic needs at least {min} characters.',
+  'ai.form.topicTooLong': 'The topic cannot exceed {max} characters.',
+  'ai.form.objectiveTooShort':
+    'The objective needs at least {min} characters.',
+  'ai.form.objectiveTooLong':
+    'The objective cannot exceed {max} characters.',
+  'ai.form.contextTooLong': 'The context cannot exceed {max} characters.',
+  'ai.form.submit': 'Generate the proposal',
+  'ai.form.privacyTitle': 'Your text goes to an external AI provider',
+  'ai.form.privacyBody':
+    'The topic, objective and context are sent to the provider. No other board data leaves Mosaiq and the proposal is not stored.',
+  'ai.form.privacyAccept': 'I understand',
+  'ai.form.privacyRequired': 'Confirm the notice before generating.',
+  'ai.form.privacySession': 'The notice appears again in a new session.',
+  'ai.state.generating': 'Generating…',
+  'ai.state.generatingBody':
+    'The provider is composing sections and notes. You can cancel at any time.',
+  'ai.state.cancel': 'Cancel generation',
+  'ai.state.cancelledTitle': 'Generation cancelled',
+  'ai.state.cancelledBody':
+    'No proposal was stored. You can send the same request again.',
+  'ai.state.retry': 'Try again',
+  'ai.state.back': 'Edit the request',
+  'ai.error.invalidTitle': 'Incomplete request',
+  'ai.error.invalidBody':
+    'Fix the highlighted fields, then generate again.',
+  'ai.error.networkTitle': 'Network unavailable',
+  'ai.error.networkBody':
+    'Mosaiq could not be reached. Check your connection and try again.',
+  'ai.error.timeoutTitle': 'Generation took too long',
+  'ai.error.timeoutBody':
+    'The provider did not answer within 35 seconds. Try again shortly.',
+  'ai.error.rateTitle': 'Too many requests',
+  'ai.error.rateBody': 'Try again in {seconds} seconds.',
+  'ai.error.rateBodyFallback': 'Wait a few minutes before retrying.',
+  'ai.error.providerTitle': 'The provider failed',
+  'ai.error.providerBody':
+    'The proposal was unusable. Try again or adjust the topic.',
+  'ai.error.unavailableTitle': 'AI is not configured',
+  'ai.error.unavailableBody':
+    'Generation is disabled on this server. Contact the administrator.',
+  'ai.error.sessionTitle': 'Session expired',
+  'ai.error.sessionBody': 'Sign in again to generate a proposal.',
+  'ai.error.workspaceTitle': 'Workspace inactive',
+  'ai.error.workspaceBody':
+    'Your account no longer has access to this workspace.',
+  'ai.error.internalTitle': 'Unexpected error',
+  'ai.error.internalBody': 'Generation failed. Try again shortly.',
+  'ai.preview.title': 'Review the proposal',
+  'ai.preview.description':
+    'Edit anything you like. This is a preview, not a board, and nothing is saved.',
+  'ai.preview.localBadge': 'Local preview — not saved',
+  'ai.preview.truncated':
+    'The proposal was trimmed to fit the contract limits.',
+  'ai.preview.boardTitle': 'Board title',
+  'ai.preview.objective': 'Objective',
+  'ai.preview.sections': 'Sections',
+  'ai.preview.sectionTitle': 'Section title',
+  'ai.preview.sectionAria': 'Section {index}: {title}',
+  'ai.preview.moveUp': 'Move section up',
+  'ai.preview.moveDown': 'Move section down',
+  'ai.preview.removeSectionAria': 'Remove section {title}',
+  'ai.preview.addSection': 'Add a section',
+  'ai.preview.addNote': 'Add a note',
+  'ai.preview.removeNoteAria': 'Remove note {index}',
+  'ai.preview.noteType': 'Note type',
+  'ai.preview.noteContent': 'Note content',
+  'ai.preview.notesCount': '{count}/{max} notes',
+  'ai.preview.totalNotes': '{count}/{max} notes in total',
+  'ai.preview.sectionsCount': '{count}/{max} sections',
+  'ai.preview.emptySection': 'No notes in this section.',
+  'ai.preview.discard': 'Close without saving',
+  'ai.preview.editRequest': 'Edit the request',
+  'ai.preview.summary': '{sections} sections · {notes} notes',
+  'ai.preview.footerHint':
+    'Creating the board writes the notes immediately. Collaborators see them as ordinary notes.',
+  'ai.preview.createBoard': 'Create the board',
+  'ai.preview.adminOnly':
+    'Only a workspace administrator can create a board. You can generate and edit proposals, but not import them.',
+  'ai.import.pending':
+    'Creating the board and its notes. Do not close this window.',
+  'ai.import.progress': 'Creating… {done}/{total} notes',
+  'ai.import.success': '“{title}” was created',
+  'ai.import.successBody': '{count} notes were added to the board.',
+  'ai.import.errorTitle': 'Import failed',
+  'ai.import.invalidBody':
+    'The edited proposal no longer meets the limits. Fix it and try again.',
+  'ai.import.forbiddenBody':
+    'Your permissions changed: only workspace administrators can create the board.',
+  'ai.import.unauthorizedBody': 'Your session expired. Sign in again and retry.',
+  'ai.import.networkBody':
+    'The server did not answer. No partial board was kept; try again.',
+  'ai.import.failedBody':
+    'The import failed and was rolled back: the notes it created were deleted and the board was moved to the trash.',
+  'ai.preview.limitsTitle': 'Limits exceeded',
+  'ai.preview.limitsBody':
+    'Some values exceed the contract. Adjust them before continuing.',
+  'ai.limit.sectionCount': 'Between {min} and {max} sections.',
+  'ai.limit.totalNotes': 'At most {max} notes.',
+  'ai.limit.fewNotes': 'At least {min} notes are required.',
+  'ai.limit.titleLength': 'The title needs {min} to {max} characters.',
+  'ai.limit.objectiveLength':
+    'The objective needs {min} to {max} characters.',
+  'ai.limit.sectionTitleLength':
+    'A section title needs {min} to {max} characters.',
+  'ai.limit.noteContentLength':
+    'A note needs {min} to {max} characters.',
+  'ai.limit.sectionNotes': 'At most {max} notes per section.',
+  'ai.limit.maxReached': 'Limit reached',
+  'ai.noteType.idea': 'Idea',
+  'ai.noteType.question': 'Question',
+  'ai.noteType.challenge': 'Challenge',
+  'ai.noteType.opportunity': 'Opportunity',
+  'ai.noteType.action': 'Action',
+  'ai.category.goals': 'Goals',
+  'ai.category.audience': 'Audience',
+  'ai.category.ideas': 'Ideas',
+  'ai.category.risks': 'Risks',
+  'ai.category.actions': 'Actions',
+  'ai.category.questions': 'Questions',
 }
 
 export const ar: Record<TranslationKey, string> = {
@@ -1151,6 +1458,151 @@ export const ar: Record<TranslationKey, string> = {
   'publicBoard.unavailableDescription': 'الرابط غير صالح أو تم إيقاف الوصول العام.',
   'publicBoard.readOnly': 'قراءة فقط (وصول عام)',
   'publicBoard.signInToEdit': 'سجّل الدخول للتعديل',
+
+  'ai.entry.short': 'عصف ذهني بالذكاء الاصطناعي',
+  'ai.entry.title': 'عصف ذهني بمساعدة الذكاء الاصطناعي',
+  'ai.entry.description': 'صِف موضوعًا واحصل على لوحة منظّمة للمراجعة.',
+  'ai.entry.action': 'أنشئ مقترحًا',
+  'ai.entry.badge': 'ذكاء اصطناعي',
+  'ai.dialog.title': 'أنشئ لوحة عصف ذهني',
+  'ai.dialog.description':
+    'تراجع معاينة قابلة للتعديل أولًا. لا يُحفظ شيء قبل قرارك.',
+  'ai.form.topic': 'الموضوع',
+  'ai.form.topicPlaceholder': 'إطلاق أسطول دراجات مشتركة في تونس',
+  'ai.form.topicHint': 'من 3 إلى 280 حرفًا. الموضوع الدقيق يساعد النموذج.',
+  'ai.form.objective': 'الهدف',
+  'ai.form.objectivePlaceholder':
+    'تحديد الأحياء الأولى والميزانية والمخاطر',
+  'ai.form.objectiveHint': 'من 5 إلى 500 حرف. جملة واحدة تكفي.',
+  'ai.form.context': 'السياق (اختياري)',
+  'ai.form.contextPlaceholder': 'القيود والجمهور والمواعيد…',
+  'ai.form.contextHint': 'حتى 2000 حرف. لا تلصق بيانات شخصية.',
+  'ai.form.language': 'لغة المحتوى',
+  'ai.form.detail': 'مستوى التفصيل',
+  'ai.form.detail.concise': 'موجز',
+  'ai.form.detail.balanced': 'متوازن',
+  'ai.form.detail.detailed': 'مفصّل',
+  'ai.form.budget.concise': 'حتى 9 ملاحظات',
+  'ai.form.budget.balanced': 'حتى 15 ملاحظة',
+  'ai.form.budget.detailed': 'حتى 25 ملاحظة',
+  'ai.form.counter': '{count}/{max} حرفًا',
+  'ai.form.required': 'هذا الحقل مطلوب.',
+  'ai.form.topicTooShort':
+    'يجب أن يحتوي الموضوع على {min} أحرف على الأقل.',
+  'ai.form.topicTooLong': 'لا يمكن أن يتجاوز الموضوع {max} حرفًا.',
+  'ai.form.objectiveTooShort':
+    'يجب أن يحتوي الهدف على {min} أحرف على الأقل.',
+  'ai.form.objectiveTooLong': 'لا يمكن أن يتجاوز الهدف {max} حرفًا.',
+  'ai.form.contextTooLong': 'لا يمكن أن يتجاوز السياق {max} حرفًا.',
+  'ai.form.submit': 'أنشئ المقترح',
+  'ai.form.privacyTitle': 'تُرسل نصوصك إلى مزوّد ذكاء اصطناعي خارجي',
+  'ai.form.privacyBody':
+    'يُرسل الموضوع والهدف والسياق إلى المزوّد. لا تُرسل أي بيانات أخرى من اللوحة ولا يُحفظ المقترح.',
+  'ai.form.privacyAccept': 'فهمت',
+  'ai.form.privacyRequired': 'أكّد الإشعار قبل الإنشاء.',
+  'ai.form.privacySession': 'يظهر الإشعار من جديد في كل جلسة جديدة.',
+  'ai.state.generating': 'جارٍ الإنشاء…',
+  'ai.state.generatingBody':
+    'يبني المزوّد الأقسام والملاحظات. يمكنك الإلغاء في أي وقت.',
+  'ai.state.cancel': 'إلغاء الإنشاء',
+  'ai.state.cancelledTitle': 'أُلغي الإنشاء',
+  'ai.state.cancelledBody':
+    'لم يُحفظ أي مقترح. يمكنك إعادة إرسال الطلب نفسه.',
+  'ai.state.retry': 'إعادة المحاولة',
+  'ai.state.back': 'تعديل الطلب',
+  'ai.error.invalidTitle': 'طلب غير مكتمل',
+  'ai.error.invalidBody': 'صحّح الحقول المشار إليها ثم أعد الإنشاء.',
+  'ai.error.networkTitle': 'الشبكة غير متاحة',
+  'ai.error.networkBody':
+    'تعذّر الوصول إلى Mosaiq. تحقّق من اتصالك ثم أعد المحاولة.',
+  'ai.error.timeoutTitle': 'استغرق الإنشاء وقتًا طويلًا',
+  'ai.error.timeoutBody':
+    'لم يستجب المزوّد خلال 35 ثانية. أعد المحاولة بعد قليل.',
+  'ai.error.rateTitle': 'طلبات كثيرة جدًا',
+  'ai.error.rateBody': 'أعد المحاولة بعد {seconds} ثانية.',
+  'ai.error.rateBodyFallback': 'انتظر بضع دقائق قبل إعادة المحاولة.',
+  'ai.error.providerTitle': 'فشل المزوّد',
+  'ai.error.providerBody':
+    'كان المقترح غير قابل للاستخدام. أعد المحاولة أو عدّل الموضوع.',
+  'ai.error.unavailableTitle': 'الذكاء الاصطناعي غير مهيّأ',
+  'ai.error.unavailableBody':
+    'الإنشاء غير مفعّل على هذا الخادم. تواصل مع المسؤول.',
+  'ai.error.sessionTitle': 'انتهت الجلسة',
+  'ai.error.sessionBody': 'سجّل الدخول من جديد لإنشاء مقترح.',
+  'ai.error.workspaceTitle': 'مساحة العمل غير نشطة',
+  'ai.error.workspaceBody':
+    'لم يعد حسابك يملك الوصول إلى مساحة العمل هذه.',
+  'ai.error.internalTitle': 'خطأ غير متوقع',
+  'ai.error.internalBody': 'فشل الإنشاء. أعد المحاولة بعد قليل.',
+  'ai.preview.title': 'راجع المقترح',
+  'ai.preview.description':
+    'عدّل المحتوى بحرية. هذه معاينة وليست لوحة، ولا يُحفظ شيء.',
+  'ai.preview.localBadge': 'معاينة محلية — غير محفوظة',
+  'ai.preview.truncated': 'تم تقليص المقترح لاحترام حدود العقد.',
+  'ai.preview.boardTitle': 'عنوان اللوحة',
+  'ai.preview.objective': 'الهدف',
+  'ai.preview.sections': 'الأقسام',
+  'ai.preview.sectionTitle': 'عنوان القسم',
+  'ai.preview.sectionAria': 'القسم {index}: {title}',
+  'ai.preview.moveUp': 'نقل القسم لأعلى',
+  'ai.preview.moveDown': 'نقل القسم لأسفل',
+  'ai.preview.removeSectionAria': 'حذف القسم {title}',
+  'ai.preview.addSection': 'إضافة قسم',
+  'ai.preview.addNote': 'إضافة ملاحظة',
+  'ai.preview.removeNoteAria': 'حذف الملاحظة {index}',
+  'ai.preview.noteType': 'نوع الملاحظة',
+  'ai.preview.noteContent': 'محتوى الملاحظة',
+  'ai.preview.notesCount': '{count}/{max} ملاحظات',
+  'ai.preview.totalNotes': '{count}/{max} ملاحظة إجمالًا',
+  'ai.preview.sectionsCount': '{count}/{max} أقسام',
+  'ai.preview.emptySection': 'لا توجد ملاحظات في هذا القسم.',
+  'ai.preview.discard': 'إغلاق دون حفظ',
+  'ai.preview.editRequest': 'تعديل الطلب',
+  'ai.preview.summary': '{sections} أقسام · {notes} ملاحظات',
+  'ai.preview.footerHint':
+    'إنشاء اللوحة يكتب الملاحظات فورًا. سيراها المتعاونون كملاحظات عادية.',
+  'ai.preview.createBoard': 'إنشاء اللوحة',
+  'ai.preview.adminOnly':
+    'إنشاء اللوحة متاح لمسؤول مساحة العمل فقط. يمكنك إنشاء المقترحات وتعديلها دون استيرادها.',
+  'ai.import.pending': 'جارٍ إنشاء اللوحة والملاحظات. لا تغلق هذه النافذة.',
+  'ai.import.progress': 'جارٍ الإنشاء… {done}/{total} ملاحظة',
+  'ai.import.success': 'تم إنشاء «{title}»',
+  'ai.import.successBody': 'أُضيفت {count} ملاحظة إلى اللوحة.',
+  'ai.import.errorTitle': 'تعذّر الاستيراد',
+  'ai.import.invalidBody':
+    'المقترح المعدّل لا يحقق الحدود. صحّحه ثم أعد المحاولة.',
+  'ai.import.forbiddenBody':
+    'تغيّرت صلاحياتك: إنشاء اللوحة متاح لمسؤول مساحة العمل فقط.',
+  'ai.import.unauthorizedBody': 'انتهت الجلسة. سجّل الدخول من جديد ثم أعد المحاولة.',
+  'ai.import.networkBody':
+    'لم يستجب الخادم. لم تُحفظ أي لوحة جزئية؛ أعد المحاولة.',
+  'ai.import.failedBody':
+    'فشل الاستيراد وتم التراجع عنه: حُذفت الملاحظات المنشأة ونُقلت اللوحة إلى المهملات.',
+  'ai.preview.limitsTitle': 'تجاوز الحدود',
+  'ai.preview.limitsBody':
+    'بعض القيم تتجاوز العقد. عدّلها قبل المتابعة.',
+  'ai.limit.sectionCount': 'من {min} إلى {max} أقسام.',
+  'ai.limit.totalNotes': 'الحد الأقصى {max} ملاحظة.',
+  'ai.limit.fewNotes': 'يلزم {min} ملاحظات على الأقل.',
+  'ai.limit.titleLength': 'عنوان اللوحة من {min} إلى {max} حرفًا.',
+  'ai.limit.objectiveLength': 'هدف اللوحة من {min} إلى {max} حرفًا.',
+  'ai.limit.sectionTitleLength':
+    'عنوان القسم من {min} إلى {max} حرفًا.',
+  'ai.limit.noteContentLength':
+    'محتوى الملاحظة من {min} إلى {max} حرفًا.',
+  'ai.limit.sectionNotes': 'الحد الأقصى {max} ملاحظات في القسم.',
+  'ai.limit.maxReached': 'تم بلوغ الحد',
+  'ai.noteType.idea': 'فكرة',
+  'ai.noteType.question': 'سؤال',
+  'ai.noteType.challenge': 'تحدٍّ',
+  'ai.noteType.opportunity': 'فرصة',
+  'ai.noteType.action': 'إجراء',
+  'ai.category.goals': 'أهداف',
+  'ai.category.audience': 'الجمهور',
+  'ai.category.ideas': 'أفكار',
+  'ai.category.risks': 'مخاطر',
+  'ai.category.actions': 'إجراءات',
+  'ai.category.questions': 'أسئلة',
 }
 
 export const dictionaries: Record<Locale, Record<TranslationKey, string>> = {

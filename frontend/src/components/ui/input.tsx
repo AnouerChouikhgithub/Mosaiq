@@ -32,18 +32,38 @@ export interface FieldProps {
   htmlFor: string
   hint?: string
   error?: string
+  /** Optional live count shown opposite the label, e.g. `12/280 characters`. */
+  counter?: string
   className?: string
   children: ReactNode
 }
 
-export function Field({ label, htmlFor, hint, error, className, children }: FieldProps) {
+export function Field({
+  label,
+  htmlFor,
+  hint,
+  error,
+  counter,
+  className,
+  children,
+}: FieldProps) {
   const messageId = `${htmlFor}-message`
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
-      <label htmlFor={htmlFor} className="text-caption font-medium text-foreground">
-        {label}
-      </label>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <label htmlFor={htmlFor} className="text-caption font-medium text-foreground">
+          {label}
+        </label>
+        {counter ? (
+          <span
+            id={`${htmlFor}-counter`}
+            className="text-caption text-muted-foreground tabular-nums"
+          >
+            {counter}
+          </span>
+        ) : null}
+      </div>
       {children}
       {error ? (
         <p id={messageId} className="text-caption text-danger-text">
@@ -72,7 +92,8 @@ export function NativeSelect({
     <div className={cn('relative', wrapperClassName)}>
       <select
         className={cn(
-          'h-11 w-full appearance-none rounded-xl border border-border bg-surface pr-9 pl-3 text-sm text-foreground transition-colors outline-none hover:border-border-strong focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-60',
+          // Logical padding/inset keeps the chevron on the end side in RTL.
+          'h-11 w-full appearance-none rounded-xl border border-border bg-surface pe-9 ps-3 text-sm text-foreground transition-colors outline-none hover:border-border-strong focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-60',
           className,
         )}
         {...props}
@@ -80,7 +101,7 @@ export function NativeSelect({
         {children}
       </select>
       <ChevronDown
-        className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground"
+        className="pointer-events-none absolute end-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
         aria-hidden="true"
       />
     </div>
