@@ -63,8 +63,11 @@ final class BrainstormingResponseValidator
 
         $sections = [];
         $totalNotes = 0;
+        // Repetition is controlled across the whole proposal, not per section: the
+        // same sticky note repeated in two sections is noise on the board.
+        $seenContents = [];
         foreach ($rawSections as $rawSection) {
-            $section = $this->buildSection($rawSection, count($sections) + 1, $totalNotes, $truncated);
+            $section = $this->buildSection($rawSection, count($sections) + 1, $totalNotes, $truncated, $seenContents);
             if (null === $section) {
                 continue;
             }
@@ -101,7 +104,10 @@ final class BrainstormingResponseValidator
         return $clamped;
     }
 
-    private function buildSection(mixed $rawSection, int $sectionIndex, int $totalNotes, bool &$truncated): ?BrainstormingSection
+    /**
+     * @param array<string, bool> $seenContents normalized content already kept, shared by every section
+     */
+    private function buildSection(mixed $rawSection, int $sectionIndex, int $totalNotes, bool &$truncated, array &$seenContents): ?BrainstormingSection
     {
         if (!is_array($rawSection) || array_is_list($rawSection)) {
             return null;
@@ -125,7 +131,6 @@ final class BrainstormingResponseValidator
         }
 
         $notes = [];
-        $seen = [];
         foreach ($rawNotes as $rawNote) {
             // Reached only when another note exists and would be dropped, so a
             // section that exactly fills its budget does not report truncation.
@@ -153,10 +158,10 @@ final class BrainstormingResponseValidator
             }
 
             $dedupeKey = mb_strtolower($clamped, 'UTF-8');
-            if (isset($seen[$dedupeKey])) {
+            if (isset($seenContents[$dedupeKey])) {
                 continue;
             }
-            $seen[$dedupeKey] = true;
+            $seenContents[$dedupeKey] = true;
 
             $rawType = $rawNote['type'] ?? null;
             $notes[] = new BrainstormingNote(
